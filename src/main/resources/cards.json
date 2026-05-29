@@ -1,0 +1,123 @@
+[
+  {
+    "id": "meal",
+    "name": "饭卡",
+    "type": "CHARACTER",
+    "description": "无特性",
+    "attack": 20,
+    "health": 70,
+    "effectType": "NONE",
+    "effectValue": 0,
+    "traits": []
+  },
+  {
+    "id": "sim",
+    "name": "电话卡",
+    "type": "CHARACTER",
+    "description": "无特性",
+    "attack": 30,
+    "health": 100,
+    "effectType": "NONE",
+    "effectValue": 0,
+    "traits": []
+  },
+  {
+    "id": "sniper",
+    "name": "枪",
+    "type": "CHARACTER",
+    "description": "上场首回合不能行动",
+    "attack": 1000,
+    "health": 40,
+    "effectType": "NONE",
+    "effectValue": 0,
+    "traits": [
+      "sniper"
+    ]
+  },
+  {
+    "id": "robin",
+    "name": "鸟女",
+    "type": "CHARACTER",
+    "description": "双角色特性暂记为普通单位",
+    "attack": 20,
+    "health": 50,
+    "effectType": "NONE",
+    "effectValue": 0,
+    "traits": [
+      "robin"
+    ]
+  },
+  {
+    "id": "dragon",
+    "name": "龙骑",
+    "type": "CHARACTER",
+    "description": "攻击时追加已损失体力值；首次被击败时会回复至1点体力。",
+    "attack": 70,
+    "health": 20,
+    "effectType": "NONE",
+    "effectValue": 0,
+    "traits": [
+      "dragon"
+    ]
+  },
+  {
+    "id": "sanctuary",
+    "name": "圣域",
+    "type": "SKILL",
+    "description": "全场所有角色最大生命与攻击提高10，每回合开始恢复10点生命,增加10点攻击",
+    "attack": 0,
+    "health": 0,
+    "effectType": "GLOBAL_BUFF",
+    "effectValue": 10,
+    "skillRange": "ALLY",
+    "traits": []
+  },
+  {
+    "id": "light",
+    "name": "圣光",
+    "type": "SKILL",
+    "description": "抵挡己方下一次受到的伤害。",
+    "attack": 0,
+    "health": 0,
+    "effectType": "SHIELD",
+    "effectValue": 1,
+    "skillRange": "ALLY",
+    "traits": []
+  },
+  {
+    "id": "soda",
+    "name": "汽水",
+    "type": "SKILL",
+    "description": "抽2张牌,单体恢复40点生命，可指定角色或玩家",
+    "attack": 0,
+    "health": 0,
+    "effectType": "HEAL_BOTH",
+    "effectValue": 40,
+    "skillRange": "SINGLE",
+    "traits": []
+  },
+  {
+    "id": "bunch",
+    "name": "普通一拳",
+    "type": "SKILL",
+    "description": "对敌方全体角色造成20点伤害。",
+    "attack": 0,
+    "health": 0,
+    "effectType": "DAMAGE_ALL_ENEMIES",
+    "effectValue": 15,
+    "skillRange": "ALLY",
+    "traits": []
+  },
+  {
+    "id": "umbrella",
+    "name": "伞",
+    "type": "SKILL",
+    "description": "使对方下一张技能牌无效。",
+    "attack": 0,
+    "health": 0,
+    "effectType": "COUNTER_EFFECT",
+    "effectValue": 1,
+    "skillRange": "ALLY",
+    "traits": []
+  }
+]

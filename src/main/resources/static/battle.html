@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>校园王 - 对局</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<main class="app-shell battle-shell">
+    <div class="legacy-action-buttons">
+        <button id="drawBtn" type="button"></button>
+        <button id="endTurnBtn" type="button"></button>
+        <button id="attackPlayerBtn" type="button"></button>
+        <div id="logs"></div>
+    </div>
+
+    <header class="topbar">
+        <div class="brand">
+            <img class="brand-title-image" src="images/ui/title.png" alt="校园王">
+            <div class="title sr-only">校园王</div>
+            <div class="subtitle">对局页</div>
+        </div>
+        <nav class="page-nav">
+            <a class="nav-link" href="index.html">大厅</a>
+            <a class="nav-link" href="cards.html">卡牌大全</a>
+            <a class="nav-link active" href="battle.html">对局</a>
+        </nav>
+        <div class="status" id="connectionInfo">未加入房间</div>
+    </header>
+
+    <section class="statusbar panel">
+        <div class="statusbar-grid">
+            <div class="status-chip room">
+                <span class="status-label">房间码</span>
+                <span class="status-value room-code" id="roomCodeText">------</span>
+            </div>
+            <div class="status-chip">
+                <span class="status-label">回合</span>
+                <span class="status-value" id="turnInfo">等待开始</span>
+            </div>
+            <div class="status-chip wide">
+                <span class="status-label">阶段</span>
+                <span class="status-value" id="phaseInfo">尚未就绪</span>
+            </div>
+            <div class="status-chip wide">
+                <span class="status-label">当前模式</span>
+                <span class="status-value" id="modeTitle">空闲</span>
+                <span class="status-subtext" id="modeText">没有正在进行的操作。</span>
+            </div>
+        </div>
+        <span id="actionHint" class="hidden-status-text"></span>
+    </section>
+
+    <section class="table panel">
+        <div class="table-layout">
+            <aside class="side-panel">
+                <div class="selection-panel" id="selectionPanel">
+                    <div class="selection-title" id="selectionTitle">未选中卡牌</div>
+                    <div class="selection-meta" id="selectionMeta">选中一张手牌后，这里可以直接确认使用。</div>
+                    <div class="button-row">
+                        <button id="confirmPlayBtn">确认出牌</button>
+                        <button class="alt" id="clearSelectionBtn">取消选择</button>
+                    </div>
+                </div>
+            </aside>
+
+            <section class="arena" id="arena"></section>
+        </div>
+    </section>
+</main>
+
+<div class="detail-modal" id="detailModal">
+    <div class="detail-card" id="detailCard"></div>
+</div>
+
+<template id="battleTemplate">
+    <section class="battle-board">
+        <div class="battle-top-strip">
+            <div class="phase-card">
+                <span>房间</span>
+                <strong data-battle="roomCode">------</strong>
+            </div>
+            <div class="phase-card">
+                <span>回合</span>
+                <strong data-battle="turn">等待</strong>
+            </div>
+            <div class="phase-card wide">
+                <span>阶段</span>
+                <strong data-battle="phase">-</strong>
+            </div>
+            <div class="effect-summary">
+                <div class="compact-effects">
+                    <span>对方</span>
+                    <div data-battle="enemyEffects"></div>
+                </div>
+                <div class="compact-effects">
+                    <span>我方</span>
+                    <div data-battle="selfEffects"></div>
+                </div>
+            </div>
+        </div>
+        <div data-battle="enemyRow"></div>
+        <div data-battle="selfRow"></div>
+        <div class="battle-bottom-row">
+            <div class="hand-zone">
+                <div class="zone-title">手牌区</div>
+                <div class="hand-row" data-battle="hand"></div>
+            </div>
+            <div class="turn-actions">
+                <button id="handConfirmBtn">确定</button>
+                <button id="handDrawBtn">抽牌</button>
+                <button class="alt" id="handEndTurnBtn">结束回合</button>
+            </div>
+            <section class="battle-log-panel">
+                <div class="zone-title">日志</div>
+                <div class="logs" id="battleLogs"></div>
+            </section>
+        </div>
+    </section>
+</template>
+
+<template id="playerRowTemplate">
+    <div class="battle-player-row">
+        <div class="player-avatar" data-player-head="true">
+            <div data-player="label"></div>
+            <span data-player="hp"></span>
+        </div>
+        <div class="summon-zone" data-player="summons"></div>
+        <div class="pile-box" data-player="pile"></div>
+        <div class="row-effects" data-player="effects"></div>
+    </div>
+</template>
+
+<template id="emptySlotTemplate">
+    <div class="summon-slot empty"></div>
+</template>
+
+<template id="cardTemplate">
+    <article class="card">
+        <div class="card-surface">
+            <div class="card-figure">
+                <img alt="">
+            </div>
+            <div class="card-overlay"></div>
+            <div class="card-body">
+                <div class="card-top">
+                    <div>
+                        <div class="card-kind"></div>
+                        <div class="card-name"></div>
+                    </div>
+                </div>
+                <div class="mini-stats"></div>
+            </div>
+        </div>
+    </article>
+</template>
+
+<script src="toast.js"></script>
+<script src="app.js?v=20260530-17"></script>
+</body>
+</html>

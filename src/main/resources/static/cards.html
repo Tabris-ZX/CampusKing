@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>校园王 - 卡牌大全</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<main class="app-shell cards-shell">
+    <header class="topbar">
+        <div class="brand">
+            <img class="brand-title-image" src="images/ui/title.png" alt="校园王">
+            <div class="title sr-only">校园王</div>
+            <div class="subtitle">所有卡牌信息陈列</div>
+        </div>
+        <nav class="page-nav">
+            <a class="nav-link" href="index.html">大厅</a>
+            <a class="nav-link active" href="cards.html">卡牌大全</a>
+            <a class="nav-link" href="battle.html">进入对局</a>
+        </nav>
+    </header>
+
+    <section class="cards-hero panel">
+        <div>
+            <p class="eyebrow">Collection</p>
+            <h1>卡牌大全</h1>
+            <p class="hero-copy">这里直接读取后端 /api/cards，显示当前可用的角色牌和技能牌。</p>
+        </div>
+        <div class="cards-filter">
+            <button class="alt active" data-filter="ALL" type="button">全部</button>
+            <button class="alt" data-filter="CHARACTER" type="button">角色牌</button>
+            <button class="alt" data-filter="SKILL" type="button">技能牌</button>
+        </div>
+    </section>
+
+    <section class="card-gallery" id="cardGallery">
+        <div class="board-empty">正在加载卡牌...</div>
+    </section>
+</main>
+
+<script src="toast.js"></script>
+<script src="cards.js?v=20260530-1"></script>
+</body>
+</html>
