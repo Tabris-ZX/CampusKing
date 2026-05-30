@@ -47,10 +47,10 @@ public class BattleService {
      */
     public int computeAttack(PlayerState owner, CardInstance cardInstance) {
         CardDefinition definition = cardCatalogService.require(cardInstance.getCardId());
-        int attack = definition.getAttack() == null ? 0 : definition.getAttack();
+        int attack = baseAttack(definition, cardInstance);
         attack += statusEffectService.sumEffectValue(owner, StatusEffectType.ATTACK_UP);
         if (hasTrait(definition, "dragon")) {
-            attack += Math.max(0, definition.getHealth() - cardInstance.getCurrentHealth());
+            attack += Math.max(0, baseHealth(definition, cardInstance) - cardInstance.getCurrentHealth());
         }
         return attack;
     }
@@ -87,14 +87,24 @@ public class BattleService {
 
             if (card.getExtraLives() > 0) {
                 card.setExtraLives(card.getExtraLives() - 1);
-                card.setCurrentHealth(definition.getHealth());
+                card.setFormIndex(card.getFormIndex() + 1);
+                card.setCurrentHealth(baseHealth(definition, card));
                 match.getLogs().add(definition.getName() + " 触发了额外命效果。");
+                continue;
+            }
+
+            var reviveEffect = statusEffectService.consumeReviveOnDeath(player, match);
+            if (reviveEffect != null) {
+                int reviveHealth = Math.max(1, baseHealth(definition, card) / Math.max(1, reviveEffect.getValue()));
+                card.setCurrentHealth(reviveHealth);
+                card.setSleeping(true);
+                match.getLogs().add(definition.getName() + " 死亡后回复到 " + reviveHealth + " 点体力");
                 continue;
             }
 
             player.getBoard().remove(card);
             match.getDiscardPile().add(card);
-            match.getLogs().add(definition.getName() + " 被击败并进入墓地。");
+            match.getLogs().add(definition.getName() + " 被击败");
         }
     }
 
@@ -107,5 +117,19 @@ public class BattleService {
 
     private boolean hasTrait(CardDefinition definition, String trait) {
         return definition.getTraits() != null && definition.getTraits().contains(trait);
+    }
+
+    private int baseAttack(CardDefinition definition, CardInstance card) {
+        if (card.getFormIndex() > 0 && definition.getSecondaryAttack() != null) {
+            return definition.getSecondaryAttack();
+        }
+        return definition.getAttack() == null ? 0 : definition.getAttack();
+    }
+
+    private int baseHealth(CardDefinition definition, CardInstance card) {
+        if (card.getFormIndex() > 0 && definition.getSecondaryHealth() != null) {
+            return definition.getSecondaryHealth();
+        }
+        return definition.getHealth() == null ? 0 : definition.getHealth();
     }
 }

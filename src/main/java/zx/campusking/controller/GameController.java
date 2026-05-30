@@ -16,6 +16,7 @@ import zx.campusking.model.dto.AttackPlayerRequest;
 import zx.campusking.model.dto.CreateMatchRequest;
 import zx.campusking.model.dto.CreateRoomRequest;
 import zx.campusking.model.dto.JoinRoomRequest;
+import zx.campusking.model.dto.LeaveRoomRequest;
 import zx.campusking.model.dto.PlayEffectRequest;
 import zx.campusking.model.dto.RestoreSessionResponse;
 import zx.campusking.model.dto.SummonRequest;
@@ -66,6 +67,12 @@ public class GameController {
     public MatchState joinRoom(@PathVariable String roomCode, @RequestBody(required = false) JoinRoomRequest request) {
         // Join must preserve backend distinction between "room not found" and "room full".
         return gameService.joinRoom(roomCode, request == null ? new JoinRoomRequest() : request);
+    }
+
+    @PostMapping("/rooms/{roomCode}/leave")
+    public Map<String, String> leaveRoom(@PathVariable String roomCode, @RequestBody(required = false) LeaveRoomRequest request) {
+        gameService.leaveRoom(roomCode, request == null ? new LeaveRoomRequest() : request);
+        return Map.of("status", "ok");
     }
 
     @GetMapping("/rooms/{roomCode}")

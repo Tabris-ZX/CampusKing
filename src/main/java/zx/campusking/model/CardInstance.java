@@ -27,6 +27,8 @@ public class CardInstance {
     private boolean revived;
     /** 额外命次数，例如鸟女的额外命。 */
     private int extraLives;
+    /** 当前形态序号，0 为初始形态。 */
+    private int formIndex;
 
     public CardInstance(String cardId, String ownerId, int currentHealth) {
         this.instanceId = UUID.randomUUID().toString();
@@ -34,5 +36,6 @@ public class CardInstance {
         this.ownerId = ownerId;
         this.currentHealth = currentHealth;
         this.sleeping = true;
+        this.formIndex = 0;
     }
 }

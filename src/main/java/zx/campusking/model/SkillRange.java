@@ -5,6 +5,8 @@ package zx.campusking.model;
  */
 public enum SkillRange {
     SINGLE,
+    SELF,
     ALLY,
+    ENEMY,
     BOTH
 }

@@ -57,6 +57,6 @@ public class DeckService {
     }
 
     private int defaultExtraLives(CardDefinition definition) {
-        return definition.getTraits() != null && definition.getTraits().contains("lark") ? 1 : 0;
+        return definition.getSecondaryHealth() != null ? 1 : 0;
     }
 }

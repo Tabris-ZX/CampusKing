@@ -1,0 +1,268 @@
+<template>
+  <main class="app-shell home-shell">
+    <AppTopbar
+      extra-class="home-topbar"
+      :status="topbarStatus"
+     subtitle="Campus King"/>
+
+    <section class="home-hero panel">
+      <div class="home-hero-copy">
+        <p class="eyebrow">Campus King</p>
+        <h1>我常常追忆过去...</h1>
+        <p class="hero-copy">
+          名字暂时保存在当前浏览器。点击“进入对局”后再选择创建房间或加入房间，
+          卡牌资料页也可以随时打开查看。
+        </p>
+        <div class="home-hero-actions">
+          <button type="button" @click="openBattleEntry">进入对局</button>
+          <RouterLink class="button-link alt" to="/cards">卡牌大全</RouterLink>
+
+        </div>
+      </div>
+
+      <aside class="profile-panel">
+        <div class="profile-head">
+          <span class="profile-label">当前玩家</span>
+          <strong>{{ displayPlayerName }}</strong>
+        </div>
+        <label for="playerName">名字</label>
+        <input id="playerName" v-model.trim="playerNameInput" autocomplete="nickname" maxlength="18" placeholder="输入你的名字">
+        <p class="profile-help">后续会改为数据库保存；现在先保存在浏览器会话里。</p>
+        <div class="profile-meta">
+          <span>{{ session.roomCode ? `当前房间 ${session.roomCode}` : "当前未加入房间" }}</span>
+          <button class="alt" type="button" @click="copyRoomCode">复制房间码</button>
+        </div>
+      </aside>
+    </section>
+
+    <section class="home-overview">
+      <article class="overview-card panel">
+        <p class="eyebrow">Resume</p>
+        <h2>进入对局</h2>
+        <p>如果浏览器里已有房间会话，可以直接回到对局页恢复身份。</p>
+        <RouterLink class="text-link" to="/battle">继续上次对局</RouterLink>
+      </article>
+      <article class="overview-card panel">
+        <p class="eyebrow">Cards</p>
+        <h2>卡牌大全</h2>
+        <p>查看角色牌和技能牌详情，支持双击放大高清图。</p>
+        <RouterLink class="text-link" to="/cards">打开卡牌资料</RouterLink>
+      </article>
+      <article class="home-session panel">
+        <div>
+          <span class="session-label">当前会话</span>
+          <strong>{{ session.roomCode ? `房间 ${session.roomCode}` : "未进入房间" }}</strong>
+        </div>
+        <div>
+          <span class="session-label">当前身份</span>
+          <strong>{{ session.selfPlayerId ? `座位 ${session.selfPlayerId}` : "尚未分配" }}</strong>
+        </div>
+        <div>
+          <span class="session-label">本地保存</span>
+          <strong>浏览器临时会话</strong>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <div class="entry-modal" :class="{ visible: entryMode !== '' }" @click.self="closeEntryModal">
+    <section v-if="entryMode" class="entry-dialog panel">
+      <button class="entry-close alt" type="button" @click="closeEntryModal">关闭</button>
+
+      <template v-if="entryMode === 'menu'">
+        <p class="eyebrow">Battle Entry</p>
+        <h2>进入对局</h2>
+        <p class="entry-copy">选择创建新房间，或者输入房间码加入现有对局。</p>
+        <div class="entry-grid">
+          <button class="entry-action" type="button" @click="entryMode = 'create'">
+            <span>创建房间</span>
+            <small>可直接创建 PVP 或人机房</small>
+          </button>
+          <button class="entry-action alt-action" type="button" @click="entryMode = 'join'">
+            <span>加入房间</span>
+            <small>输入已有房间码并进入</small>
+          </button>
+        </div>
+      </template>
+
+      <form v-else-if="entryMode === 'create'" class="entry-form" @submit.prevent="createRoom">
+        <p class="eyebrow">Create</p>
+        <h2>创建房间</h2>
+        <p class="entry-copy">创建后会自动以房主身份进入对局。</p>
+        <label class="checkbox-row">
+          <input v-model="botMode" type="checkbox">
+          <span>创建人机模式房间</span>
+        </label>
+        <div class="entry-form-actions">
+          <button type="submit">创建并进入</button>
+          <button class="alt" type="button" @click="entryMode = 'menu'">返回</button>
+        </div>
+      </form>
+
+      <form v-else class="entry-form" @submit.prevent="joinRoom">
+        <p class="eyebrow">Join</p>
+        <h2>加入房间</h2>
+        <p class="entry-copy">输入房主提供的房间码后进入对局。</p>
+        <label for="roomCodeInput">房间码</label>
+        <input id="roomCodeInput" v-model.trim="roomCodeInput" autocomplete="off" placeholder="例如 BC2485">
+        <div class="entry-form-actions">
+          <button type="submit">加入并进入</button>
+          <button class="alt" type="button" @click="entryMode = 'menu'">返回</button>
+        </div>
+      </form>
+    </section>
+  </div>
+</template>
+
+<script setup>
+import { computed, onMounted, ref, watch } from "vue";
+import { RouterLink, useRouter } from "vue-router";
+import AppTopbar from "../components/AppTopbar.vue";
+import { api } from "../lib/game";
+import { generateClientToken, loadSession, saveSession } from "../lib/session";
+import { showToast } from "../lib/toast";
+
+const router = useRouter();
+const session = ref({
+  baseUrl: window.location.origin,
+  roomCode: "",
+  selfPlayerId: "",
+  playerToken: "",
+  playerName: ""
+});
+const playerNameInput = ref("");
+const roomCodeInput = ref("");
+const botMode = ref(false);
+const entryMode = ref("");
+
+const displayPlayerName = computed(() => playerNameInput.value || session.value.playerName || "未命名玩家");
+const topbarStatus = computed(() => `玩家 ${displayPlayerName.value}`);
+const connectionInfo = computed(() => {
+  if (!session.value.roomCode) {
+    return "未加入房间";
+  }
+  return `已有会话：${session.value.roomCode} / ${session.value.selfPlayerId || "未知身份"}`;
+});
+
+watch(playerNameInput, value => {
+  session.value = {
+    ...session.value,
+    playerName: value || ""
+  };
+  saveSession(session.value);
+});
+
+function persist() {
+  saveSession(session.value);
+}
+
+function ensurePlayerName() {
+  const name = playerNameInput.value.trim();
+  if (!name) {
+    showToast("请先输入你的名字", "error");
+    return "";
+  }
+  return name;
+}
+
+function openBattleEntry() {
+  if (!ensurePlayerName()) {
+    return;
+  }
+  entryMode.value = "menu";
+}
+
+function closeEntryModal() {
+  entryMode.value = "";
+}
+
+async function createRoom() {
+  try {
+    const playerName = ensurePlayerName();
+    if (!playerName) {
+      return;
+    }
+    const playerToken = generateClientToken();
+    const match = await api("/api/rooms", {
+      method: "POST",
+      body: JSON.stringify({
+        hostName: playerName,
+        playerToken,
+        botMode: botMode.value
+      })
+    });
+    session.value = {
+      baseUrl: window.location.origin,
+      roomCode: match.roomCode,
+      selfPlayerId: "P1",
+      playerToken,
+      playerName
+    };
+    persist();
+    closeEntryModal();
+    router.push("/battle");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+}
+
+async function joinRoom() {
+  try {
+    const playerName = ensurePlayerName();
+    if (!playerName) {
+      return;
+    }
+    const roomCode = roomCodeInput.value.trim().toUpperCase();
+    if (!roomCode) {
+      showToast("请输入房间码", "error");
+      return;
+    }
+    const playerToken = generateClientToken();
+    await api(`/api/rooms/${roomCode}/join`, {
+      method: "POST",
+      body: JSON.stringify({ playerName, playerToken })
+    });
+    session.value = {
+      baseUrl: window.location.origin,
+      roomCode,
+      selfPlayerId: "P2",
+      playerToken,
+      playerName
+    };
+    persist();
+    closeEntryModal();
+    router.push("/battle");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+}
+
+async function copyRoomCode() {
+  if (!session.value.roomCode) {
+    showToast("当前没有房间码", "error");
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(session.value.roomCode);
+    showToast("房间码已复制", "success");
+  } catch {
+    showToast("复制失败", "error");
+  }
+}
+
+onMounted(() => {
+  const saved = loadSession();
+  if (!saved) {
+    return;
+  }
+  session.value = {
+    baseUrl: saved.baseUrl || window.location.origin,
+    roomCode: saved.roomCode || "",
+    selfPlayerId: saved.selfPlayerId || "",
+    playerToken: saved.playerToken || "",
+    playerName: saved.playerName || ""
+  };
+  playerNameInput.value = session.value.playerName;
+  roomCodeInput.value = session.value.roomCode;
+});
+</script>

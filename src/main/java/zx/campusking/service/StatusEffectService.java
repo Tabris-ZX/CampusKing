@@ -39,7 +39,7 @@ public class StatusEffectService {
             }
         }
         removeExpiredEffects(player);
-        match.getLogs().add(player.getName() + " 刷新了持续效果回合数。");
+        match.getLogs().add(player.getName() + " 刷新了持续效果回合数");
     }
 
     public void applyOrRefreshEffect(PlayerState player, StatusEffect incoming) {
@@ -76,6 +76,17 @@ public class StatusEffectService {
         return base + sumEffectValue(player, StatusEffectType.MAX_HP_UP);
     }
 
+    public int effectiveMaxHealth(PlayerState player, CardInstance card) {
+        CardDefinition definition = cardCatalogService.require(card.getCardId());
+        int base;
+        if (card.getFormIndex() > 0 && definition.getSecondaryHealth() != null) {
+            base = definition.getSecondaryHealth();
+        } else {
+            base = definition.getHealth() == null ? 0 : definition.getHealth();
+        }
+        return base + sumEffectValue(player, StatusEffectType.MAX_HP_UP);
+    }
+
     public boolean consumeShield(PlayerState player, MatchState match, String targetName) {
         StatusEffect shield = findFirstEffect(player, StatusEffectType.SHIELD);
         if (shield == null) {
@@ -96,6 +107,17 @@ public class StatusEffectService {
         removeExpiredEffects(player);
         match.getLogs().add(player.getName() + " 消耗了一层技能反制效果。");
         return true;
+    }
+
+    public StatusEffect consumeReviveOnDeath(PlayerState player, MatchState match) {
+        StatusEffect revive = findFirstEffect(player, StatusEffectType.REVIVE_ON_DEATH);
+        if (revive == null) {
+            return null;
+        }
+        revive.setStacks(Math.max(0, revive.getStacks() - 1));
+        removeExpiredEffects(player);
+        match.getLogs().add(player.getName() + " 消耗了一层死亡复活效果。");
+        return revive;
     }
 
     public void removeExpiredEffects(PlayerState player) {

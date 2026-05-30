@@ -3,6 +3,8 @@ package zx.campusking.model.dto;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.List;
+
 @Setter
 @Getter
 /**
@@ -19,5 +21,7 @@ public class PlayEffectRequest {
     private String targetPlayerId;
     /** 目标角色实例 id，可为空表示直接指定玩家。 */
     private String targetInstanceId;
+    /** 额外弃置的手牌实例 id，仅部分技能使用。 */
+    private List<String> discardInstanceIds;
 
 }

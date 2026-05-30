@@ -14,6 +14,7 @@ import zx.campusking.model.dto.AttackPlayerRequest;
 import zx.campusking.model.dto.CreateMatchRequest;
 import zx.campusking.model.dto.CreateRoomRequest;
 import zx.campusking.model.dto.JoinRoomRequest;
+import zx.campusking.model.dto.LeaveRoomRequest;
 import zx.campusking.model.dto.PlayEffectRequest;
 import zx.campusking.model.dto.RestoreSessionResponse;
 import zx.campusking.model.dto.SummonRequest;
@@ -162,6 +163,36 @@ public class GameService {
         return match;
     }
 
+    public void leaveRoom(String roomCode, LeaveRoomRequest request) {
+        if (request.getPlayerToken() == null || request.getPlayerToken().isBlank()) {
+            throw new IllegalArgumentException("缺少玩家会话标识。");
+        }
+
+        MatchState match = getMatchByRoomCode(roomCode);
+        PlayerState leavingPlayer = match.getPlayers().stream()
+                .filter(player -> request.getPlayerToken().equals(player.getPlayerToken()))
+                .findFirst()
+                .orElseThrow(() -> new NoSuchElementException("该房间中不存在当前浏览器会话。"));
+
+        match.getPlayers().removeIf(player -> player.getPlayerId().equals(leavingPlayer.getPlayerId()));
+        match.getLogs().add(leavingPlayer.getName() + " 退出了房间。");
+
+        if (match.getPlayers().isEmpty()) {
+            removeMatch(match);
+            return;
+        }
+
+        if (match.getPhase() != GamePhase.FINISHED) {
+            PlayerState remainingPlayer = match.getPlayers().get(0);
+            match.setWinnerId(remainingPlayer.getPlayerId());
+            match.setPhase(GamePhase.FINISHED);
+            match.setReady(false);
+            match.getLogs().add(remainingPlayer.getName() + " 因对手离开获胜。");
+        }
+
+        broadcastMatch(match);
+    }
+
     /**
      * 浏览器刷新恢复。
      * 前端持久化 roomCode + playerToken，再由后端换回 playerId。
@@ -219,9 +250,14 @@ public class GameService {
         deckService.drawOne(match, player);
         statusEffectService.tickStatusDurations(player, match);
         statusEffectService.applyTurnStartEffects(match, player);
+        checkWinner(match);
+        if (match.getPhase() == GamePhase.FINISHED) {
+            broadcastMatch(match);
+            return match;
+        }
         wakeBoard(player);
         match.setPhase(GamePhase.ACTION);
-        match.getLogs().add(player.getName() + " 抽了 2 张牌。");
+        match.getLogs().add(player.getName() + " 抽了 2 张牌");
 
         broadcastMatch(match);
         return match;
@@ -241,7 +277,7 @@ public class GameService {
             throw new IllegalStateException("召唤区已满。");
         }
         if (player.getSummonsThisTurn() >= 1) {
-            throw new IllegalStateException("每回合最多只能召唤 1 个角色。");
+            throw new IllegalStateException("每回合最多召唤 1 个角色");
         }
 
         CardInstance card = matchSupportService.removeFromHand(player, request.getHandInstanceId());
@@ -254,7 +290,8 @@ public class GameService {
         card.setSleeping(definition.getTraits() != null && definition.getTraits().contains("sniper"));
         player.getBoard().add(card);
         player.setSummonsThisTurn(player.getSummonsThisTurn() + 1);
-        match.getLogs().add(player.getName() + " 召唤了 " + definition.getName() + "。");
+        match.getLogs().add(player.getName() + " 召唤了 " + definition.getName());
+        checkWinner(match);
 
         broadcastMatch(match);
         return match;
@@ -274,19 +311,19 @@ public class GameService {
         CardInstance card = matchSupportService.removeFromHand(player, request.getHandInstanceId());
         CardDefinition definition = cardCatalogService.require(card.getCardId());
         if (definition.getType() != CardType.SKILL) {
-            throw new IllegalStateException("只有技能牌可以这样使用。");
+            throw new IllegalStateException("只有技能牌可以这样使用!");
         }
 
         if (skillResolverService.consumeNegateSkill(enemy, match, definition)) {
             match.getDiscardPile().add(card);
-            match.getLogs().add(enemy.getName() + " 使技能 " + definition.getName() + " 无效。");
+            match.getLogs().add(enemy.getName() + " 使技能 " + definition.getName() + " 无效");
             broadcastMatch(match);
             return match;
         }
 
         skillResolverService.resolveEffect(match, player, enemy, definition, request);
         match.getDiscardPile().add(card);
-        match.getLogs().add(player.getName() + " 使用了技能 " + definition.getName() + "。");
+        match.getLogs().add(player.getName() + " 使用了技能 " + definition.getName());
         checkWinner(match);
 
         broadcastMatch(match);
@@ -316,7 +353,7 @@ public class GameService {
 
         attacker.setSleeping(true);
         battleService.cleanupDefeated(match, enemy);
-        match.getLogs().add(battleService.cardName(attacker) + " 攻击了 " + battleService.cardName(defender) + "。");
+        match.getLogs().add(battleService.cardName(attacker) + " 攻击了 " + battleService.cardName(defender));
         checkWinner(match);
 
         broadcastMatch(match);
@@ -366,7 +403,7 @@ public class GameService {
         match.setCurrentPlayerId(enemy.getPlayerId());
         match.setPhase(GamePhase.DRAW);
         match.setTurn(match.getTurn() + 1);
-        match.getLogs().add(player.getName() + " 结束了回合。");
+        match.getLogs().add(player.getName() + " 结束了回合");
 
         broadcastMatch(match);
         runBotTurnIfNeeded(match);
@@ -392,7 +429,7 @@ public class GameService {
                 PlayerState winner = matchSupportService.requireOpponent(match, player.getPlayerId());
                 match.setWinnerId(winner.getPlayerId());
                 match.setPhase(GamePhase.FINISHED);
-                match.getLogs().add(winner.getName() + " 赢得了对局。");
+                match.getLogs().add(winner.getName() + " 赢得了对局!");
                 return;
             }
         }
@@ -449,6 +486,11 @@ public class GameService {
         deckService.drawOne(match, bot);
         statusEffectService.tickStatusDurations(bot, match);
         statusEffectService.applyTurnStartEffects(match, bot);
+        checkWinner(match);
+        if (match.getPhase() == GamePhase.FINISHED) {
+            broadcastMatch(match);
+            return;
+        }
         wakeBoard(bot);
         match.setPhase(GamePhase.ACTION);
         match.getLogs().add("机器人抽了 2 张牌。");
@@ -483,7 +525,13 @@ public class GameService {
                 skillResolverService.resolveEffect(match, bot, player, definition, request);
                 match.getDiscardPile().add(firstSkill);
                 match.getLogs().add("机器人使用了技能 " + definition.getName() + "。");
+                checkWinner(match);
             }
+        }
+
+        if (match.getPhase() == GamePhase.FINISHED) {
+            broadcastMatch(match);
+            return;
         }
 
         match.setCurrentPlayerId("P1");
@@ -503,6 +551,13 @@ public class GameService {
         try {
             gameWebSocketHandler.broadcast(match.getRoomCode(), objectMapper.writeValueAsString(match));
         } catch (Exception ignored) {
+        }
+    }
+
+    private void removeMatch(MatchState match) {
+        matches.remove(match.getMatchId());
+        if (match.getRoomCode() != null) {
+            roomIndex.remove(match.getRoomCode());
         }
     }
 }

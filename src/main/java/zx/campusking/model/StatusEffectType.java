@@ -10,5 +10,6 @@ public enum StatusEffectType {
     TURN_HEAL,
     SHIELD,
     BLOCK_DAMAGE,
-    NEGATE_NEXT_SKILL
+    NEGATE_NEXT_SKILL,
+    REVIVE_ON_DEATH
 }

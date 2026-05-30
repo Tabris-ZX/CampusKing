@@ -1,0 +1,348 @@
+.home-shell {
+  max-width: 1360px;
+  gap: 24px;
+}
+
+.home-topbar {
+  align-items: start;
+}
+
+.home-topbar .page-nav {
+  margin-left: auto;
+}
+
+.home-topbar .status {
+  order: 2;
+  align-self: start;
+  font-weight: 800;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(236, 248, 246, 0.88));
+  border-color: rgba(56, 102, 154, 0.14);
+}
+
+.home-hero {
+  padding: clamp(28px, 4vw, 54px);
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(300px, 420px);
+  gap: 28px;
+  align-items: stretch;
+  position: relative;
+  overflow: hidden;
+  border-radius: 30px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(244, 251, 247, 0.96) 40%, rgba(234, 244, 255, 0.98)),
+    var(--panel);
+  box-shadow:
+    0 24px 54px rgba(15, 23, 42, 0.09),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+}
+
+.home-hero::before {
+  content: "";
+  position: absolute;
+  inset: auto -6% -28% auto;
+  width: 420px;
+  height: 420px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(47, 129, 247, 0.12) 0, rgba(63, 185, 80, 0.06) 44%, transparent 74%);
+  pointer-events: none;
+}
+
+.home-hero-copy {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  align-content: center;
+  gap: 10px;
+  min-height: 360px;
+}
+
+.home-hero h1 {
+  margin: 0;
+  max-width: 760px;
+  font-size: clamp(42px, 6vw, 78px);
+  line-height: 0.98;
+  letter-spacing: -0.04em;
+}
+
+.home-hero .hero-copy {
+  max-width: 640px;
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.75;
+}
+
+.home-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.home-hero-actions button,
+.home-hero-actions .button-link {
+  min-height: 52px;
+  padding: 0 20px;
+  font-weight: 900;
+}
+
+.profile-panel {
+  position: relative;
+  z-index: 1;
+  border-radius: 24px;
+  border: 1px solid rgba(27, 31, 35, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(241, 247, 250, 0.94));
+  padding: 22px;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.96);
+}
+
+.profile-head {
+  display: grid;
+  gap: 6px;
+}
+
+.profile-label,
+.session-label {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.profile-head strong {
+  font-size: clamp(28px, 3vw, 38px);
+  line-height: 1.05;
+}
+
+.profile-panel input {
+  min-height: 48px;
+  border-radius: 16px;
+  font-size: 15px;
+}
+
+.profile-help {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+  font-size: 14px;
+}
+
+.profile-meta {
+  display: grid;
+  gap: 10px;
+  padding-top: 8px;
+}
+
+.profile-meta span {
+  font-weight: 800;
+}
+
+.profile-meta button {
+  justify-self: start;
+}
+
+.home-overview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.overview-card {
+  padding: 22px 22px 24px;
+  display: grid;
+  gap: 10px;
+  min-height: 208px;
+  align-content: start;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(241, 248, 250, 0.96)),
+    var(--panel);
+}
+
+.overview-card h2 {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.08;
+}
+
+.overview-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.72;
+}
+
+.text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+  color: var(--accent-dark);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.text-link:hover {
+  text-decoration: underline;
+}
+
+.home-session {
+  padding: 18px 20px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(240, 247, 250, 0.96)),
+    var(--panel);
+}
+
+.home-session > div {
+  display: grid;
+  gap: 8px;
+}
+
+.home-session strong {
+  font-size: 18px;
+}
+
+.entry-modal {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(10, 20, 32, 0.38);
+  backdrop-filter: blur(10px);
+  z-index: 9200;
+}
+
+.entry-modal.visible {
+  display: flex;
+}
+
+.entry-dialog {
+  width: min(760px, 100%);
+  padding: 28px;
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(242, 249, 247, 0.98)),
+    var(--panel);
+}
+
+.entry-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+}
+
+.entry-dialog h2 {
+  margin: 0;
+  font-size: clamp(30px, 4vw, 46px);
+  line-height: 1;
+}
+
+.entry-copy {
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.entry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.entry-action {
+  min-height: 170px;
+  border-radius: 24px;
+  display: grid;
+  gap: 10px;
+  align-content: end;
+  justify-items: start;
+  padding: 22px;
+  background:
+    linear-gradient(145deg, #1c7ed6, #2f9eaa);
+  box-shadow: 0 20px 40px rgba(47, 158, 170, 0.24);
+}
+
+.entry-action span {
+  font-size: 28px;
+  font-weight: 900;
+}
+
+.entry-action small {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.entry-action.alt-action {
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(242, 248, 251, 0.98));
+  color: var(--ink);
+  border: 1px solid rgba(27, 31, 35, 0.08);
+  box-shadow: 0 18px 34px rgba(15, 23, 42, 0.08);
+}
+
+.entry-action.alt-action small {
+  color: var(--muted);
+}
+
+.entry-form {
+  display: grid;
+  gap: 14px;
+}
+
+.entry-form input {
+  min-height: 50px;
+  border-radius: 16px;
+}
+
+.entry-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.entry-form-actions button {
+  min-height: 48px;
+  font-weight: 900;
+}
+
+@media (max-width: 1100px) {
+  .home-hero,
+  .home-overview,
+  .home-session {
+    grid-template-columns: 1fr;
+  }
+  .home-hero-copy {
+    min-height: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .entry-grid,
+  .home-hero-actions,
+  .entry-form-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .entry-grid {
+    display: grid;
+  }
+
+  .home-hero h1 {
+    font-size: 38px;
+  }
+
+  .home-hero-actions button,
+  .home-hero-actions .button-link,
+  .entry-form-actions button {
+    width: 100%;
+  }
+}
