@@ -7,10 +7,12 @@ import zx.campusking.model.GamePhase;
 import zx.campusking.model.MatchState;
 import zx.campusking.model.PlayerState;
 import zx.campusking.model.dto.CreateRoomRequest;
+import zx.campusking.model.dto.EndTurnRequest;
 import zx.campusking.websocket.GameWebSocketHandler;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -55,10 +57,44 @@ class GameServiceBotTurnTests {
 
         assertNotNull(result);
         assertEquals("P1", result.getCurrentPlayerId());
-        assertEquals(GamePhase.DRAW, result.getPhase());
+        assertEquals(GamePhase.ACTION, result.getPhase());
         assertEquals(3, result.getTurn());
-        assertTrue(result.getDiscardPile().stream().anyMatch(card -> "soda".equals(card.getCardId())));
-        assertTrue(target.getCurrentHealth() < 100);
+        assertTrue(result.getLogs().stream().anyMatch(log -> log.contains("瓦库结束了回合")));
+    }
+
+    @Test
+    void endingTurnDiscardsHandDownToLimit() throws IOException {
+        GameService service = createGameService();
+        CreateRoomRequest request = new CreateRoomRequest();
+        request.setBotMode(true);
+        request.setHostName("测试玩家");
+
+        MatchState match = service.createRoom(request);
+        PlayerState human = match.getPlayers().stream()
+                .filter(player -> "P1".equals(player.getPlayerId()))
+                .findFirst()
+                .orElseThrow();
+
+        human.getHand().clear();
+        for (int index = 0; index < 10; index += 1) {
+            human.getHand().add(new CardInstance("meal", human.getPlayerId(), 100));
+        }
+        match.setCurrentPlayerId(human.getPlayerId());
+        match.setPhase(GamePhase.ACTION);
+        match.setReady(true);
+        match.setDrawPile(new ArrayList<>());
+
+        EndTurnRequest endTurnRequest = new EndTurnRequest();
+        endTurnRequest.setPlayerId(human.getPlayerId());
+        endTurnRequest.setDiscardInstanceIds(List.of(
+                human.getHand().get(0).getInstanceId(),
+                human.getHand().get(1).getInstanceId()
+        ));
+
+        MatchState result = service.endTurn(match.getMatchId(), endTurnRequest);
+
+        assertEquals(PlayerState.HAND_LIMIT, human.getHand().size());
+        assertTrue(result.getLogs().stream().anyMatch(log -> log.contains("回合结束弃置了 2 张手牌")));
     }
 
     private GameService createGameService() throws IOException {

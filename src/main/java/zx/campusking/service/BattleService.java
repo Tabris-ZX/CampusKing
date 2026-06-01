@@ -51,6 +51,7 @@ public class BattleService {
         CardDefinition definition = cardCatalogService.require(cardInstance.getCardId());
         int attack = baseAttack(definition, cardInstance);
         attack += statusEffectService.sumEffectValue(owner, StatusEffectType.ATTACK_UP);
+        attack += statusEffectService.sumEffectValue(cardInstance, StatusEffectType.ATTACK_UP);
         return cardCatalogService.requireCard(definition.getId())
                 .modifyAttack(new CardCombatContext(owner, cardInstance, definition), attack);
     }

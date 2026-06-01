@@ -18,6 +18,8 @@ public class PlayerState {
     public static final int MAX_HP = 100;
     /** 每名玩家的召唤区格子数。 */
     public static final int SUMMON_SLOTS = 3;
+    /** 默认手牌上限。 */
+    public static final int HAND_LIMIT = 8;
 
     /** 对局内玩家席位 id，例如 P1 / P2。 */
     private final String playerId;

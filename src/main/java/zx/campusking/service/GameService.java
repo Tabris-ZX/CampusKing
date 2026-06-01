@@ -12,15 +12,18 @@ import zx.campusking.model.PlayerState;
 import zx.campusking.model.dto.AttackCharacterRequest;
 import zx.campusking.model.dto.AttackPlayerRequest;
 import zx.campusking.model.dto.CreateRoomRequest;
+import zx.campusking.model.dto.EndTurnRequest;
 import zx.campusking.model.dto.JoinRoomRequest;
 import zx.campusking.model.dto.LeaveRoomRequest;
 import zx.campusking.model.dto.PlayEffectRequest;
 import zx.campusking.model.dto.RestoreSessionResponse;
+import zx.campusking.model.dto.SacrificeRequest;
 import zx.campusking.model.dto.SummonRequest;
 import zx.campusking.websocket.GameWebSocketHandler;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -128,6 +131,7 @@ public class GameService {
             deckService.drawOne(match, match.getPlayers().get(0));
             deckService.drawOne(match, playerB);
         }
+        startTurn(match, match.getPlayers().get(0));
 
         broadcastMatch(match);
         return match;
@@ -208,19 +212,7 @@ public class GameService {
         matchSupportService.ensureReady(match);
         matchSupportService.ensurePhase(match, GamePhase.DRAW);
 
-        player.setSummonsThisTurn(0);
-        deckService.drawOne(match, player);
-        deckService.drawOne(match, player);
-        statusEffectService.tickStatusDurations(player, match);
-        statusEffectService.applyTurnStartEffects(match, player);
-        checkWinner(match);
-        if (match.getPhase() == GamePhase.FINISHED) {
-            broadcastMatch(match);
-            return match;
-        }
-        wakeBoard(player);
-        match.setPhase(GamePhase.ACTION);
-        match.getLogs().add(player.getName() + " 抽了 2 张牌");
+        startTurn(match, player);
 
         broadcastMatch(match);
         return match;
@@ -255,6 +247,40 @@ public class GameService {
         player.setSummonsThisTurn(player.getSummonsThisTurn() + 1);
         match.getLogs().add(player.getName() + " 召唤了 " + definition.getName());
         checkWinner(match);
+
+        broadcastMatch(match);
+        return match;
+    }
+
+    /**
+     * 献祭己方召唤区一名角色：该角色进入墓地，然后当前玩家抽 1 张牌。
+     */
+    public MatchState sacrifice(String matchId, SacrificeRequest request) {
+        MatchState match = getMatch(matchId);
+        PlayerState player = matchSupportService.requireCurrentPlayer(match, request.getPlayerId());
+        matchSupportService.ensureReady(match);
+        matchSupportService.ensureActionPhase(match);
+
+        CardInstance target = matchSupportService.requireBoardCard(player, request.getTargetInstanceId());
+        player.getBoard().remove(target);
+        match.getDiscardPile().add(target);
+        deckService.drawOne(match, player);
+        match.getLogs().add(player.getName() + " 献祭了 " + battleService.cardName(target) + "，抽取了 1 张牌。");
+
+        broadcastMatch(match);
+        return match;
+    }
+
+    /**
+     * 手牌排序：角色牌在前，技能牌在后，同类型保持原相对顺序。
+     */
+    public MatchState sortHand(String matchId, String playerId) {
+        MatchState match = getMatch(matchId);
+        matchSupportService.ensureNotFinished(match);
+        matchSupportService.ensureReady(match);
+        PlayerState player = matchSupportService.requirePlayer(match, playerId);
+        player.getHand().sort(Comparator.comparingInt(card -> handSortRank(card.getCardId())));
+        match.getLogs().add(player.getName() + " 整理了手牌。");
 
         broadcastMatch(match);
         return match;
@@ -357,20 +383,48 @@ public class GameService {
      * 结束当前玩家回合，并把回合控制权切给对手。
      */
     public MatchState endTurn(String matchId, String playerId) {
+        EndTurnRequest request = new EndTurnRequest();
+        request.setPlayerId(playerId);
+        return endTurn(matchId, request);
+    }
+
+    /**
+     * 结束当前玩家回合，并把回合控制权切给对手。
+     */
+    public MatchState endTurn(String matchId, EndTurnRequest request) {
         MatchState match = getMatch(matchId);
-        PlayerState player = matchSupportService.requireCurrentPlayer(match, playerId);
+        PlayerState player = matchSupportService.requireCurrentPlayer(match, request.getPlayerId());
         PlayerState enemy = matchSupportService.requireOpponent(match, player.getPlayerId());
         matchSupportService.ensureNotFinished(match);
         matchSupportService.ensureReady(match);
 
+        discardDownToHandLimit(match, player, request.getDiscardInstanceIds(), false);
         match.setCurrentPlayerId(enemy.getPlayerId());
-        match.setPhase(GamePhase.DRAW);
         match.setTurn(match.getTurn() + 1);
         match.getLogs().add(player.getName() + " 结束了回合");
+        startTurn(match, enemy);
 
         broadcastMatch(match);
         runBotTurnIfNeeded(match);
         return match;
+    }
+
+    /**
+     * 回合开始自动抽 2 张牌并进入行动阶段。
+     */
+    private void startTurn(MatchState match, PlayerState player) {
+        player.setSummonsThisTurn(0);
+        deckService.drawOne(match, player);
+        deckService.drawOne(match, player);
+        statusEffectService.tickStatusDurations(player, match);
+        statusEffectService.applyTurnStartEffects(match, player);
+        checkWinner(match);
+        if (match.getPhase() == GamePhase.FINISHED) {
+            return;
+        }
+        wakeBoard(player);
+        match.setPhase(GamePhase.ACTION);
+        match.getLogs().add(player.getName() + " 自动抽了 2 张牌。");
     }
 
     /**
@@ -430,6 +484,7 @@ public class GameService {
             deckService.drawOne(match, match.getPlayers().get(0));
             deckService.drawOne(match, bot);
         }
+        startTurn(match, match.getPlayers().get(0));
     }
 
     /**
@@ -443,20 +498,7 @@ public class GameService {
         }
 
         PlayerState bot = matchSupportService.requirePlayer(match, "P2");
-        matchSupportService.ensurePhase(match, GamePhase.DRAW);
-        bot.setSummonsThisTurn(0);
-        deckService.drawOne(match, bot);
-        deckService.drawOne(match, bot);
-        statusEffectService.tickStatusDurations(bot, match);
-        statusEffectService.applyTurnStartEffects(match, bot);
-        checkWinner(match);
-        if (match.getPhase() == GamePhase.FINISHED) {
-            broadcastMatch(match);
-            return;
-        }
-        wakeBoard(bot);
-        match.setPhase(GamePhase.ACTION);
-        match.getLogs().add("瓦库抽了 2 张牌。");
+        matchSupportService.ensureActionPhase(match);
 
         CardInstance firstCharacter = bot.getHand().stream()
                 .filter(card -> cardCatalogService.require(card.getCardId()).getType() == CardType.CHARACTER)
@@ -496,11 +538,50 @@ public class GameService {
             return;
         }
 
+        discardDownToHandLimit(match, bot, null, true);
         match.setCurrentPlayerId("P1");
-        match.setPhase(GamePhase.DRAW);
         match.setTurn(match.getTurn() + 1);
         match.getLogs().add("瓦库结束了回合。");
+        startTurn(match, matchSupportService.requirePlayer(match, "P1"));
         broadcastMatch(match);
+    }
+
+    private void discardDownToHandLimit(MatchState match, PlayerState player, List<String> discardInstanceIds, boolean automatic) {
+        int overflow = player.getHand().size() - PlayerState.HAND_LIMIT;
+        if (overflow <= 0) {
+            return;
+        }
+        List<String> selectedIds = discardInstanceIds == null ? List.of() : discardInstanceIds.stream()
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
+                .toList();
+        if (!automatic && selectedIds.size() != overflow) {
+            throw new IllegalStateException("手牌超过上限，请选择 " + overflow + " 张手牌弃置。");
+        }
+        if (automatic) {
+            for (int index = 0; index < overflow; index += 1) {
+                CardInstance discarded = player.getHand().remove(player.getHand().size() - 1);
+                match.getDiscardPile().add(discarded);
+            }
+        } else {
+            for (String discardId : selectedIds) {
+                boolean inHand = player.getHand().stream()
+                        .anyMatch(card -> card.getInstanceId().equals(discardId));
+                if (!inHand) {
+                    throw new IllegalArgumentException("手牌中不存在该卡牌: " + discardId);
+                }
+            }
+            for (String discardId : selectedIds) {
+                CardInstance discarded = matchSupportService.removeFromHand(player, discardId);
+                match.getDiscardPile().add(discarded);
+            }
+        }
+        match.getLogs().add(player.getName() + " 回合结束弃置了 " + overflow + " 张手牌。");
+    }
+
+    private int handSortRank(String cardId) {
+        CardType type = cardCatalogService.require(cardId).getType();
+        return type == CardType.CHARACTER ? 0 : 1;
     }
 
     private boolean canBotPrepareSkill(MatchState match, PlayerState bot, PlayerState player, CardInstance skill) {

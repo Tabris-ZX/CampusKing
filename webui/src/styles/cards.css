@@ -88,12 +88,21 @@
   display: grid;
   grid-template-rows: auto auto;
   position: relative;
+  border-width: 3px;
   border-radius: var(--radius-lg);
   background:
     var(--surface-gradient),
     var(--panel);
   transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
   cursor: default;
+}
+
+.catalog-card.catalog-card-character {
+  border-color: #ff0000;
+}
+
+.catalog-card.catalog-card-skill {
+  border-color: #0000ff;
 }
 
 .catalog-card:hover {

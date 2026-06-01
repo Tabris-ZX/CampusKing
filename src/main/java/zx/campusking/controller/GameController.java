@@ -14,10 +14,12 @@ import zx.campusking.config.AssetProperties;
 import zx.campusking.model.dto.AttackCharacterRequest;
 import zx.campusking.model.dto.AttackPlayerRequest;
 import zx.campusking.model.dto.CreateRoomRequest;
+import zx.campusking.model.dto.EndTurnRequest;
 import zx.campusking.model.dto.JoinRoomRequest;
 import zx.campusking.model.dto.LeaveRoomRequest;
 import zx.campusking.model.dto.PlayEffectRequest;
 import zx.campusking.model.dto.RestoreSessionResponse;
+import zx.campusking.model.dto.SacrificeRequest;
 import zx.campusking.model.dto.SummonRequest;
 import zx.campusking.model.MatchState;
 import zx.campusking.service.CardCatalogService;
@@ -176,6 +178,30 @@ public class GameController {
     }
 
     /**
+     * 献祭己方召唤区一名角色，并抽 1 张牌。
+     *
+     * @param matchId 对局 id
+     * @param request 献祭请求
+     * @return 结算后的对局快照
+     */
+    @PostMapping("/matches/{matchId}/sacrifice")
+    public MatchState sacrifice(@PathVariable String matchId, @RequestBody SacrificeRequest request) {
+        return gameService.sacrifice(matchId, request);
+    }
+
+    /**
+     * 手牌排序：角色牌在前，技能牌在后。
+     *
+     * @param matchId 对局 id
+     * @param playerId 玩家 id
+     * @return 排序后的对局快照
+     */
+    @PostMapping("/matches/{matchId}/sort-hand")
+    public MatchState sortHand(@PathVariable String matchId, @RequestParam String playerId) {
+        return gameService.sortHand(matchId, playerId);
+    }
+
+    /**
      * 使用角色攻击对方角色。
      *
      * @param matchId 对局 id
@@ -203,12 +229,21 @@ public class GameController {
      * 结束当前玩家回合。
      *
      * @param matchId 对局 id
-     * @param playerId 当前玩家 id
+     * @param playerId 当前玩家 id，兼容旧接口
+     * @param request 结束回合请求，可为空
      * @return 切换回合后的对局快照
      */
     @PostMapping("/matches/{matchId}/end-turn")
-    public MatchState endTurn(@PathVariable String matchId, @RequestParam String playerId) {
-        return gameService.endTurn(matchId, playerId);
+    public MatchState endTurn(
+            @PathVariable String matchId,
+            @RequestParam(required = false) String playerId,
+            @RequestBody(required = false) EndTurnRequest request
+    ) {
+        EndTurnRequest resolved = request == null ? new EndTurnRequest() : request;
+        if ((resolved.getPlayerId() == null || resolved.getPlayerId().isBlank()) && playerId != null) {
+            resolved.setPlayerId(playerId);
+        }
+        return gameService.endTurn(matchId, resolved);
     }
 
     /**

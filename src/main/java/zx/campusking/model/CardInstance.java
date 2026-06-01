@@ -3,6 +3,8 @@ package zx.campusking.model;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -29,6 +31,8 @@ public class CardInstance {
     private int extraLives;
     /** 当前形态序号，0 为初始形态。 */
     private int formIndex;
+    /** 当前作用在这名场上角色身上的状态效果。 */
+    private final List<StatusEffect> statusEffects = new ArrayList<>();
 
     /**
      * 创建一张进入对局的卡牌实例。

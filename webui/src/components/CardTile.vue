@@ -1,5 +1,5 @@
 <template>
-  <article class="catalog-card panel" @dblclick="$emit('preview', card)">
+  <article class="catalog-card panel" :class="cardTypeClass" @dblclick="$emit('preview', card)">
     <div class="catalog-art" :class="{ 'no-image': imageFailed || !image }">
       <img v-if="image && !imageFailed" :src="image" :alt="card.name" @error="handleImageError">
     </div>
@@ -46,6 +46,10 @@ defineEmits(["preview"]);
 
 const imageFailed = ref(false);
 const image = computed(() => cardImage(props.card, {}, props.assetBaseUrl));
+const cardTypeClass = computed(() => ({
+  "catalog-card-character": props.card.type === "CHARACTER",
+  "catalog-card-skill": props.card.type === "SKILL"
+}));
 
 function handleImageError(event) {
   if (!swapCardImageToFallback(event, props.card, {}, props.assetBaseUrl)) {

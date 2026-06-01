@@ -9,6 +9,13 @@
           <section v-else class="battle-board">
             <div class="battle-top-strip">
               <div class="battle-headline">
+                <button
+                  class="alt danger-button battle-exit-action"
+                  :disabled="leavingBattle"
+                  @click="handleLeaveBattle"
+                >
+                  退出对局
+                </button>
                 <span class="battle-headline-label">对局状态</span>
                 <strong>{{ battleHeadline }}</strong>
                 <span class="battle-headline-subtext">{{ battleSubtext }}</span>
@@ -82,6 +89,17 @@
                         @dblclick="openDetail(slot.card)"
                       >
                         <div class="card-surface">
+                          <div v-if="boardEffectBadges(slot.card).length" class="card-effect-stack">
+                            <span
+                              v-for="effect in boardEffectBadges(slot.card)"
+                              :key="effect.key"
+                              class="card-effect-badge"
+                              :class="effect.category"
+                              :title="effect.label"
+                            >
+                              {{ effect.shortLabel }}
+                            </span>
+                          </div>
                           <div
                             class="card-figure"
                             :class="{ 'no-image': !cardImageFor(slot.card.cardId) }"
@@ -103,8 +121,8 @@
                               </div>
                             </div>
                             <div class="mini-stats">
-                              <span>攻 {{ describeAttack(cardDef(slot.card.cardId), slot.card.formIndex || 0) }}</span>
-                              <span>体 {{ slot.card.currentHealth || cardDef(slot.card.cardId).health || 0 }}</span>
+                              <span>攻 {{ boardAttack(slot.card) }}</span>
+                              <span>体 {{ boardHealth(slot.card) }}</span>
                             </div>
                           </div>
                         </div>
@@ -138,6 +156,17 @@
                         @dblclick="openDetail(slot.card)"
                       >
                         <div class="card-surface">
+                          <div v-if="boardEffectBadges(slot.card).length" class="card-effect-stack">
+                            <span
+                              v-for="effect in boardEffectBadges(slot.card)"
+                              :key="effect.key"
+                              class="card-effect-badge"
+                              :class="effect.category"
+                              :title="effect.label"
+                            >
+                              {{ effect.shortLabel }}
+                            </span>
+                          </div>
                           <div
                             class="card-figure"
                             :class="{ 'no-image': !cardImageFor(slot.card.cardId) }"
@@ -159,8 +188,8 @@
                               </div>
                             </div>
                             <div class="mini-stats">
-                              <span>攻 {{ describeAttack(cardDef(slot.card.cardId), slot.card.formIndex || 0) }}</span>
-                              <span>体 {{ slot.card.currentHealth || cardDef(slot.card.cardId).health || 0 }}</span>
+                              <span>攻 {{ boardAttack(slot.card) }}</span>
+                              <span>体 {{ boardHealth(slot.card) }}</span>
                             </div>
                           </div>
                         </div>
@@ -172,7 +201,11 @@
 
               <aside class="battle-right-rail">
                 <div class="pile-box">墓地<br>{{ match.discardPile?.length || 0 }}</div>
-                <div class="pile-box draw-pile-box" :class="{ 'fx-draw-source': drawPulse }">抽牌堆<br>{{ match.drawPile?.length || 0 }}</div>
+                <div class="pile-box draw-pile-box" :class="{ 'fx-draw-source': drawPulse }">
+                  <span>抽牌堆</span>
+                  <strong>{{ match.drawPile?.length || 0 }}</strong>
+                  <small>{{ topDrawPileName }}</small>
+                </div>
 
                 <section class="battle-log-panel">
                   <div class="zone-title">日志</div>
@@ -202,7 +235,7 @@
                     :key="card.instanceId"
                     class="card selectable"
                     :class="handCardClass(card)"
-                    @click="selectedHandId = card.instanceId"
+                    @click="handleHandCardClick(card)"
                     @dblclick="openDetail(card)"
                   >
                     <div class="card-surface">
@@ -243,10 +276,10 @@
 
               <div class="turn-actions-panel">
                 <div class="turn-actions">
-                  <button :disabled="!canConfirmSelectedHand" @click="confirmSelectedHand">确定</button>
-                  <button :disabled="!canDrawCards" @click="drawPhase">抽牌</button>
-                  <button class="alt" @click="endTurn">结束回合</button>
-                  <button class="alt danger-button" :disabled="leavingBattle" @click="handleLeaveBattle">退出对局</button>
+                  <button class="action-confirm" :disabled="!canConfirmSelectedHand" @click="confirmSelectedHand">确定</button>
+                  <button class="action-sacrifice" :disabled="!canSacrifice" @click="toggleSacrificeMode">献祭</button>
+                  <button class="action-sort" :disabled="!canSortHand" @click="sortHand">手牌排序</button>
+                  <button class="action-end-turn" @click="endTurn">结束回合</button>
                 </div>
               </div>
             </div>
@@ -310,8 +343,11 @@ const assetBaseUrl = ref("");
 const match = ref(null);
 const cardsMap = ref({});
 const selectedHandId = ref("");
+const discardSelectionIds = ref([]);
+const discardMode = ref(false);
 const selectedAttackerId = ref("");
 const pendingSkillTarget = ref(null);
+const sacrificeMode = ref(false);
 const pollTimer = ref(null);
 const socket = ref(null);
 const detailCard = ref(null);
@@ -366,13 +402,19 @@ const emptyStateText = computed(() => {
   return "还没有对局会话。请先回到首页创建或加入房间。";
 });
 
-const canDrawCards = computed(() => {
-  return !!match.value && match.value.ready && isMyTurn.value && match.value.phase === "DRAW";
+const canSacrifice = computed(() => {
+  return !!match.value && match.value.ready && isMyTurn.value && match.value.phase === "ACTION" && !!selfPlayer.value?.board?.length;
 });
+
+const canSortHand = computed(() => {
+  return !!match.value && match.value.ready && !!selfPlayer.value && (selfPlayer.value.hand?.length || 0) > 1;
+});
+
+const discardOverflow = computed(() => Math.max(0, (selfPlayer.value?.hand?.length || 0) - 8));
 
 const canConfirmSelectedHand = computed(() => {
   const my = selfPlayer.value;
-  if (!match.value || !match.value.ready || !my || !selectedHandId.value || !isMyTurn.value || match.value.phase !== "ACTION") {
+  if (discardMode.value || !match.value || !match.value.ready || !my || !selectedHandId.value || !isMyTurn.value || match.value.phase !== "ACTION") {
     return false;
   }
   const selectedCard = my.hand.find(card => card.instanceId === selectedHandId.value);
@@ -389,6 +431,12 @@ const canConfirmSelectedHand = computed(() => {
 const modeTitle = computed(() => {
   if (pendingSkillTarget.value) {
     return "当前模式：选择技能目标";
+  }
+  if (discardMode.value) {
+    return "当前模式：选择弃牌";
+  }
+  if (sacrificeMode.value) {
+    return "当前模式：选择献祭角色";
   }
   if (selectedAttackerId.value) {
     return "当前模式：攻击目标选择";
@@ -410,6 +458,12 @@ const modeText = computed(() => {
     return definition
       ? `请为 ${definition.name} 选择一个角色或玩家目标。`
       : "请为当前技能选择一个角色或玩家目标。";
+  }
+  if (discardMode.value) {
+    return `请选择 ${discardOverflow.value} 张手牌弃置，已选择 ${discardSelectionIds.value.length} 张。`;
+  }
+  if (sacrificeMode.value) {
+    return "请选择己方召唤区一名角色献祭。";
   }
   if (selectedAttackerId.value) {
     const attacker = my.board.find(card => card.instanceId === selectedAttackerId.value);
@@ -441,6 +495,10 @@ const selfSlots = computed(() => {
 const opponentEffects = computed(() => toEffectBadges(opponentPlayer.value));
 const selfEffects = computed(() => toEffectBadges(selfPlayer.value));
 const battleLogs = computed(() => match.value?.logs || []);
+const topDrawPileName = computed(() => {
+  const topCard = match.value?.drawPile?.[0];
+  return topCard ? cardDef(topCard.cardId).name : "空";
+});
 const inviteBlockedReason = computed(() => {
   if (!roomCode.value) {
     return "当前没有可分享的房间";
@@ -513,8 +571,70 @@ function toEffectBadges(player) {
   return (player?.statusEffects || []).map((effect, index) => ({
     key: `${effect.type}-${effect.remainingTurns ?? "none"}-${index}`,
     label: describeEffect(effect),
+    shortLabel: describeShortEffect(effect),
     category: effect.category === "debuff" ? "debuff" : "buff"
   }));
+}
+
+function boardEffectBadges(card) {
+  return (card?.statusEffects || []).map((effect, index) => ({
+    key: `${effect.type}-${effect.remainingTurns ?? "none"}-${index}`,
+    label: describeEffect(effect),
+    shortLabel: describeShortEffect(effect),
+    category: effect.category === "debuff" ? "debuff" : "buff"
+  }));
+}
+
+function describeShortEffect(effect) {
+  const valueSuffix = effect.value ? `+${effect.value}` : "";
+  switch (effect.type) {
+    case "ATTACK_UP":
+      return `攻${valueSuffix}`;
+    case "MAX_HP_UP":
+      return `体${valueSuffix}`;
+    case "TURN_HEAL":
+      return `回${valueSuffix}`;
+    case "SHIELD":
+      return "盾";
+    case "NEGATE_NEXT_SKILL":
+      return "反";
+    case "REVIVE_ON_DEATH":
+      return "复";
+    default:
+      return effect.category === "debuff" ? "弱" : "强";
+  }
+}
+
+function sumCardEffect(card, type) {
+  return (card?.statusEffects || [])
+    .filter(effect => effect.type === type)
+    .reduce((total, effect) => total + (Number(effect.value) || 0), 0);
+}
+
+function currentFormAttack(definition, formIndex = 0) {
+  if (formIndex > 0 && definition.secondaryAttack != null) {
+    return Number(definition.secondaryAttack) || 0;
+  }
+  return Number(definition.attack) || 0;
+}
+
+function currentFormHealth(definition, formIndex = 0) {
+  if (formIndex > 0 && definition.secondaryHealth != null) {
+    return Number(definition.secondaryHealth) || 0;
+  }
+  return Number(definition.health) || 0;
+}
+
+function boardAttack(card) {
+  const definition = cardDef(card.cardId);
+  const base = currentFormAttack(definition, card.formIndex || 0);
+  return base + sumCardEffect(card, "ATTACK_UP");
+}
+
+function boardHealth(card) {
+  const definition = cardDef(card.cardId);
+  const maxHealth = currentFormHealth(definition, card.formIndex || 0) + sumCardEffect(card, "MAX_HP_UP");
+  return `${card.currentHealth ?? maxHealth}/${maxHealth}`;
 }
 
 function logKey(log, index) {
@@ -555,6 +675,14 @@ function scrollLogsToBottom() {
   });
 }
 
+function isLogsNearBottom() {
+  if (!logsRef.value) {
+    return true;
+  }
+  const distance = logsRef.value.scrollHeight - logsRef.value.scrollTop - logsRef.value.clientHeight;
+  return distance < 24;
+}
+
 function mapInstances(list = []) {
   return new Map(list.map(card => [card.instanceId, card]));
 }
@@ -567,6 +695,7 @@ function processMatchAnimations(nextMatch, previousMatch) {
     scrollLogsToBottom();
     return;
   }
+  const shouldAutoScrollLogs = isLogsNearBottom();
 
   const previousPlayers = previousMatch.players || [];
   const nextPlayers = nextMatch.players || [];
@@ -622,7 +751,9 @@ function processMatchAnimations(nextMatch, previousMatch) {
     }, 1600);
   }
 
-  scrollLogsToBottom();
+  if (shouldAutoScrollLogs) {
+    scrollLogsToBottom();
+  }
 }
 
 function persistSession() {
@@ -643,8 +774,11 @@ function resetLocalBattleState() {
   playerName.value = preservedPlayerName;
   match.value = null;
   selectedHandId.value = "";
+  discardSelectionIds.value = [];
+  discardMode.value = false;
   selectedAttackerId.value = "";
   pendingSkillTarget.value = null;
+  sacrificeMode.value = false;
   detailCard.value = null;
   highlightedLogKey.value = "";
   summonedCardIds.value = [];
@@ -740,12 +874,17 @@ function playerAvatarClass(player) {
 
 function boardCardClass(instance, isSelfBoard) {
   const canAttack = isSelfBoard && isMyTurn.value && match.value?.phase === "ACTION" && !instance.sleeping;
+  const canSacrificeTarget = isSelfBoard && sacrificeMode.value && isMyTurn.value && match.value?.phase === "ACTION";
   const targetable = (!isSelfBoard && !!selectedAttackerId.value && isMyTurn.value && match.value?.phase === "ACTION")
     || !!pendingSkillTarget.value;
+  const definition = cardDef(instance.cardId);
   return {
-    selectable: canAttack,
+    "card-character": definition.type === "CHARACTER",
+    "card-skill": definition.type === "SKILL",
+    selectable: canAttack || canSacrificeTarget,
     "attacker-selected": selectedAttackerId.value === instance.instanceId,
     "attack-target": targetable,
+    "sacrifice-target": canSacrificeTarget,
     "fx-summoned": summonedCardIds.value.includes(instance.instanceId),
     "fx-attacking": attackingCardIds.value.includes(instance.instanceId),
     "fx-hit": damagedCardIds.value.includes(instance.instanceId)
@@ -753,8 +892,12 @@ function boardCardClass(instance, isSelfBoard) {
 }
 
 function handCardClass(instance) {
+  const definition = cardDef(instance.cardId);
   return {
-    selected: selectedHandId.value === instance.instanceId,
+    "card-character": definition.type === "CHARACTER",
+    "card-skill": definition.type === "SKILL",
+    selected: !discardMode.value && selectedHandId.value === instance.instanceId,
+    "discard-selected": discardSelectionIds.value.includes(instance.instanceId),
     "fx-draw-arrival": drawnHandIds.value.includes(instance.instanceId)
   };
 }
@@ -866,6 +1009,9 @@ async function confirmSelectedHand() {
   if (!canConfirmSelectedHand.value || !selfPlayer.value) {
     return;
   }
+  sacrificeMode.value = false;
+  discardMode.value = false;
+  discardSelectionIds.value = [];
   const selectedCard = selfPlayer.value.hand.find(card => card.instanceId === selectedHandId.value);
   if (!selectedCard) {
     return;
@@ -878,6 +1024,26 @@ async function confirmSelectedHand() {
   }
 }
 
+function handleHandCardClick(card) {
+  if (discardMode.value) {
+    toggleDiscardSelection(card.instanceId);
+    return;
+  }
+  selectedHandId.value = card.instanceId;
+}
+
+function toggleDiscardSelection(instanceId) {
+  if (discardSelectionIds.value.includes(instanceId)) {
+    discardSelectionIds.value = discardSelectionIds.value.filter(id => id !== instanceId);
+    return;
+  }
+  if (discardSelectionIds.value.length >= discardOverflow.value) {
+    showToast(`只需要选择 ${discardOverflow.value} 张手牌弃置。`, "info");
+    return;
+  }
+  discardSelectionIds.value = [...discardSelectionIds.value, instanceId];
+}
+
 async function summonCard(instanceId) {
   try {
     match.value = await api(`/api/matches/${match.value.matchId}/summon`, {
@@ -885,6 +1051,9 @@ async function summonCard(instanceId) {
       body: JSON.stringify({ playerId: selfPlayerId.value, handInstanceId: instanceId })
     });
     selectedHandId.value = "";
+    sacrificeMode.value = false;
+    discardMode.value = false;
+    discardSelectionIds.value = [];
     persistSession();
     showToast("角色已召唤", "success");
   } catch (error) {
@@ -912,6 +1081,9 @@ async function playSkill(instanceId, targetPlayerId = null, targetInstanceId = n
     });
     pendingSkillTarget.value = null;
     selectedHandId.value = "";
+    sacrificeMode.value = false;
+    discardMode.value = false;
+    discardSelectionIds.value = [];
     persistSession();
     showToast("技能已使用", "success");
   } catch (error) {
@@ -931,6 +1103,9 @@ async function attackCharacter(attackerInstanceId, defenderInstanceId) {
       })
     });
     selectedAttackerId.value = "";
+    sacrificeMode.value = false;
+    discardMode.value = false;
+    discardSelectionIds.value = [];
     persistSession();
     showToast("攻击已结算", "success");
   } catch (error) {
@@ -957,6 +1132,9 @@ async function attackPlayer() {
       })
     });
     selectedAttackerId.value = "";
+    sacrificeMode.value = false;
+    discardMode.value = false;
+    discardSelectionIds.value = [];
     persistSession();
     showToast("已对玩家造成伤害。", "success");
   } catch (error) {
@@ -964,16 +1142,52 @@ async function attackPlayer() {
   }
 }
 
-async function drawPhase() {
-  if (!canDrawCards.value) {
+function toggleSacrificeMode() {
+  if (!canSacrifice.value) {
+    return;
+  }
+  sacrificeMode.value = !sacrificeMode.value;
+  selectedAttackerId.value = "";
+  selectedHandId.value = "";
+  discardMode.value = false;
+  discardSelectionIds.value = [];
+  pendingSkillTarget.value = null;
+  showToast(sacrificeMode.value ? "请选择己方召唤区一名角色献祭。" : "已取消献祭。", "info");
+}
+
+async function sacrificeCard(instanceId) {
+  try {
+    match.value = await api(`/api/matches/${match.value.matchId}/sacrifice`, {
+      method: "POST",
+      body: JSON.stringify({
+        playerId: selfPlayerId.value,
+        targetInstanceId: instanceId
+      })
+    });
+    sacrificeMode.value = false;
+    discardMode.value = false;
+    discardSelectionIds.value = [];
+    persistSession();
+    showToast("献祭已结算", "success");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+}
+
+async function sortHand() {
+  if (!canSortHand.value) {
     return;
   }
   try {
-    match.value = await api(`/api/matches/${match.value.matchId}/draw?playerId=${selfPlayerId.value}`, {
+    match.value = await api(`/api/matches/${match.value.matchId}/sort-hand?playerId=${selfPlayerId.value}`, {
       method: "POST"
     });
+    selectedHandId.value = "";
+    sacrificeMode.value = false;
+    discardMode.value = false;
+    discardSelectionIds.value = [];
     persistSession();
-    showToast("已完成抽牌阶段", "success");
+    showToast("手牌已排序", "success");
   } catch (error) {
     showToast(error.message, "error");
   }
@@ -983,11 +1197,34 @@ async function endTurn() {
   if (!match.value) {
     return;
   }
+  if (discardOverflow.value > 0) {
+    if (!discardMode.value) {
+      discardMode.value = true;
+      discardSelectionIds.value = [];
+      selectedHandId.value = "";
+      selectedAttackerId.value = "";
+      sacrificeMode.value = false;
+      pendingSkillTarget.value = null;
+      showToast(`手牌超过上限，请选择 ${discardOverflow.value} 张手牌弃置。`, "info");
+      return;
+    }
+    if (discardSelectionIds.value.length !== discardOverflow.value) {
+      showToast(`还需要选择 ${discardOverflow.value - discardSelectionIds.value.length} 张手牌。`, "error");
+      return;
+    }
+  }
   try {
-    match.value = await api(`/api/matches/${match.value.matchId}/end-turn?playerId=${selfPlayerId.value}`, {
-      method: "POST"
+    match.value = await api(`/api/matches/${match.value.matchId}/end-turn`, {
+      method: "POST",
+      body: JSON.stringify({
+        playerId: selfPlayerId.value,
+        discardInstanceIds: discardSelectionIds.value
+      })
     });
     selectedAttackerId.value = "";
+    sacrificeMode.value = false;
+    discardMode.value = false;
+    discardSelectionIds.value = [];
     persistSession();
     showToast("回合已结束", "success");
   } catch (error) {
@@ -1005,6 +1242,14 @@ async function handleBoardCardClick(instance, ownerId, isSelfBoard) {
   }
   if (pendingSkillTarget.value) {
     await playSkill(pendingSkillTarget.value.instanceId, ownerId, instance.instanceId);
+    return;
+  }
+  if (sacrificeMode.value) {
+    if (!isSelfBoard) {
+      showToast("只能献祭己方召唤区角色。", "error");
+      return;
+    }
+    await sacrificeCard(instance.instanceId);
     return;
   }
   if (isSelfBoard) {
@@ -1048,6 +1293,10 @@ function onKeydown(event) {
     }
     if (pendingSkillTarget.value) {
       pendingSkillTarget.value = null;
+      return;
+    }
+    if (sacrificeMode.value) {
+      sacrificeMode.value = false;
     }
   }
 }

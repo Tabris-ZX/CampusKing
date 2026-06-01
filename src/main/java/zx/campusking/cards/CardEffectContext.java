@@ -54,16 +54,18 @@ public record CardEffectContext(
     }
 
     /**
-     * 给目标玩家添加圣域类全局增益，并立即按增益值恢复玩家生命。
+     * 把圣域类全局增益分发给目标玩家场上的每名角色。
      */
     public void applyGlobalBuff(PlayerState target) {
         int value = value();
         int duration = duration(2);
-        statusEffectService.applyOrRefreshEffect(target, new StatusEffect(StatusEffectType.ATTACK_UP, "buff", value, 1, duration, definition.getId()));
-        statusEffectService.applyOrRefreshEffect(target, new StatusEffect(StatusEffectType.MAX_HP_UP, "buff", value, 1, duration, definition.getId()));
-        statusEffectService.applyOrRefreshEffect(target, new StatusEffect(StatusEffectType.TURN_HEAL, "buff", value, 1, duration, definition.getId()));
-        int maxHp = PlayerState.MAX_HP + statusEffectService.sumEffectValue(target, StatusEffectType.MAX_HP_UP);
-        target.setHp(Math.min(maxHp, target.getHp() + value));
+        for (CardInstance card : target.getBoard()) {
+            statusEffectService.applyOrRefreshEffect(card, new StatusEffect(StatusEffectType.ATTACK_UP, "buff", value, 1, duration, definition.getId()));
+            statusEffectService.applyOrRefreshEffect(card, new StatusEffect(StatusEffectType.MAX_HP_UP, "buff", value, 1, duration, definition.getId()));
+            statusEffectService.applyOrRefreshEffect(card, new StatusEffect(StatusEffectType.TURN_HEAL, "buff", value, 1, duration, definition.getId()));
+            int maxHealth = statusEffectService.effectiveMaxHealth(target, card);
+            card.setCurrentHealth(Math.min(maxHealth, card.getCurrentHealth() + value));
+        }
     }
 
     /**
