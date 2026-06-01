@@ -8,7 +8,7 @@
         <button class="nav-link nav-button" type="button" @click="noticeOpen = true">公告</button>
         <button class="nav-link nav-button" :class="{ active: docsOpen }" type="button" @click="docsOpen = true">文档</button>
         <button class="nav-link nav-button" :class="{ active: route.name === 'admin' }" type="button" @click="openAdminEntry">管理</button>
-        <a class="nav-link" :href="githubUrl" target="_blank" rel="noreferrer">GitHub</a>
+        <a class="nav-link" :href="repoUrl" target="_blank" rel="noreferrer">GitHub</a>
       </nav>
       <div class="topbar-tools">
         <span v-if="visibleStatus" class="status topbar-status">{{ visibleStatus }}</span>
@@ -92,7 +92,7 @@ import designMarkdown from "../../../docs/design.md?raw";
 import howToAddMarkdown from "../../../docs/how-to-add.md?raw";
 import ruleMarkdown from "../../../docs/rule.md?raw";
 import { isAdminAuthenticated, loadAnnouncementMarkdown, markAdminAuthenticated, renderMarkdown, verifyAdminPassword } from "../lib/admin";
-import { assetUrl } from "../lib/runtime-config";
+import { assetUrl, githubUrl } from "../lib/runtime-config";
 import { ensureSessionPlayerName, loadSession } from "../lib/session";
 import { showToast } from "../lib/toast";
 
@@ -118,7 +118,7 @@ const props = defineProps({
 const route = useRoute();
 const router = useRouter();
 const titleImageUrl = computed(() => assetUrl("images/ui/title.png"));
-const githubUrl = "https://github.com/Tabris-ZX/CampusKing";
+const repoUrl = computed(() => githubUrl());
 const noticeOpen = ref(false);
 const docsOpen = ref(false);
 const adminAuthOpen = ref(false);

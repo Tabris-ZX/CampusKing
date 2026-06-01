@@ -1,8 +1,8 @@
 ### 项目 ###
 .vscode/
+.mvn/
 webui/node_modules/
 webui/dist/
-
 data
 logs
 resources

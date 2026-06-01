@@ -1,16 +1,15 @@
 import { EFFECT_CATEGORY_TEXT, EFFECT_TYPE_TEXT, SKILL_RANGE_TEXT, TYPE_TEXT } from "./constants";
 import { apiRoot } from "./runtime-config";
 
-export function apiBase() {
-  return apiRoot();
-}
-
 export function buildInviteLink(roomCode, baseUrl = apiRoot()) {
   const normalizedRoomCode = (roomCode || "").trim().toUpperCase();
   if (!normalizedRoomCode) {
     return "";
   }
   const normalizedBaseUrl = (baseUrl || apiRoot()).replace(/\/$/, "");
+  if (normalizedBaseUrl.includes("/#/")) {
+    return `${normalizedBaseUrl}${normalizedBaseUrl.endsWith("/") ? "" : "/"}?roomID=${encodeURIComponent(normalizedRoomCode)}`;
+  }
   return `${normalizedBaseUrl}/#/?roomID=${encodeURIComponent(normalizedRoomCode)}`;
 }
 
@@ -42,7 +41,7 @@ export function isMissingRoomError(error) {
 }
 
 export async function api(path, options = {}) {
-  const response = await fetch(`${apiBase()}${path}`, {
+  const response = await fetch(`${apiRoot()}${path}`, {
     headers: { "Content-Type": "application/json" },
     ...options
   });
@@ -107,16 +106,6 @@ export function describeAttack(card, currentFormIndex = 0) {
   return card.attack || 0;
 }
 
-export function describeHealth(card, currentFormIndex = 0) {
-  if (!card) {
-    return 0;
-  }
-  if (card.secondaryHealth != null && currentFormIndex > 0) {
-    return card.secondaryHealth;
-  }
-  return card.health || 0;
-}
-
 export function cardImage(cardOrId, cardsMap = {}, assetBaseUrl = "") {
   const card = typeof cardOrId === "string" ? cardsMap[cardOrId] : cardOrId;
   if (!card?.id) {
@@ -127,7 +116,7 @@ export function cardImage(cardOrId, cardsMap = {}, assetBaseUrl = "") {
   if (normalizedAssetBaseUrl) {
     return `${normalizedAssetBaseUrl}/images/texture/${folder}/${card.id}.png`;
   }
-  const base = apiBase().replace(/\/$/, "");
+  const base = apiRoot().replace(/\/$/, "");
   return `${base}/api/assets/card-images/${folder}/${card.id}`;
 }
 

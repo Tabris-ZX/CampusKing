@@ -1,6 +1,6 @@
 # CampusKing
 
-`CampusKing` 是一个基于 Spring Boot + Vue 的校园主题卡牌对战游戏原型。
+`CampusKing` 是一个基于 Spring Boot + Vue 的肉鸽卡牌PVP游戏原型。
 
 当前项目包含：
 
@@ -9,15 +9,38 @@
 - Java 卡牌类：每张卡是一个 `GameCard` 实现，位于 `src/main/java/zx/campusking/cards/`。
 - 资源目录：图片和 favicon 放在项目根目录 `resources/`，可同步到 COS 桶。
 
-## 当前玩法
+## 游戏玩法
+[完整规则(暂未完整实现)](https://github.com/Tabris-ZX/CampusKing/blob/master/docs/rule.md)
 
+### 当前玩法
 - 支持 `PVP` 双人房间和 `PVE` 人机房间。
 - 每名玩家初始 `100 HP`，每回合默认抽 `2` 张牌。
 - 每名玩家有 `3` 个召唤位，每回合最多召唤 `1` 个角色。
 - 角色牌可以攻击对方角色；对方场上没有角色时可以直接攻击玩家。
 - 技能牌由具体卡牌类实现效果，已包含护盾、反制、群伤、持续增益、抽牌换牌、弃置手牌等机制。
 
-## 目录结构
+## 快速启动
+
+### 一键启动
+
+根目录下的`setup.sh`
+
+### 前后端分别启动
+
+后端:
+```bash
+bash ./mvnw spring-boot:run
+```
+前端:
+```bash
+cd webui
+npm install
+npm run dev
+```
+
+## 开发指南
+
+### 目录结构
 
 ```text
 src/main/java/zx/campusking
@@ -37,7 +60,7 @@ webui
 └── package.json
 ```
 
-## 配置
+### 配置
 
 主要配置在 `config/config.yaml`：
 
@@ -49,6 +72,7 @@ frontend:
   baseUrl: "http://124.220.147.235:5173/CampusKing/#/"
   apiBaseUrl: ""
   wsBaseUrl: ""
+  githubUrl: "https://github.com/Tabris-ZX/CampusKing"
 
 asset:
   baseUrl: "https://campus-king-1367968873.cos.ap-shanghai.myqcloud.com/campus-king"
@@ -72,61 +96,6 @@ resources/images/texture/characters/dragon.png
 resources/images/texture/skills/soda.png
 ```
 
-## 快速启动
+### 新增卡牌
 
-后端：
-
-```bash
-bash ./mvnw spring-boot:run
-```
-
-前端：
-
-```bash
-cd webui
-npm install
-npm run dev
-```
-
-默认开发地址：
-
-```text
-后端: http://localhost:8080
-前端: http://localhost:5173
-```
-
-## 构建与校验
-
-后端测试：
-
-```bash
-bash ./mvnw test
-```
-
-前端构建：
-
-```bash
-cd webui
-npm run build
-```
-
-## 新增卡牌
-
-角色牌放在：
-
-```text
-src/main/java/zx/campusking/cards/characters/
-```
-
-技能牌放在：
-
-```text
-src/main/java/zx/campusking/cards/skills/
-```
-
-新增卡牌优先继承：
-
-- `BaseCharacterCard`
-- `BaseSkillCard`
-
-卡牌行为通过 `GameCard` hook 和 `CardEffectContext`、`CardCombatContext`、`CardDefeatContext` 扩展。详细说明见 `docs/how-to-add.md`，规则和设计见 `docs/rule.md`、`docs/design.md`。
+[指南](https://github.com/Tabris-ZX/CampusKing/blob/master/docs/how-to-add.md)

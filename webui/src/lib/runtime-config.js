@@ -26,10 +26,7 @@ const configuredApiBase = normalizeAbsoluteUrl(injectedConfig.apiBaseUrl);
 const configuredWsBase = normalizeAbsoluteUrl(injectedConfig.wsBaseUrl);
 const configuredWsGamePath = normalizePath(injectedConfig.wsGamePath, "/ws/game");
 const configuredAssetBase = normalizeAbsoluteUrl(injectedConfig.assetBaseUrl);
-
-export function appBaseUrl() {
-  return baseUrl;
-}
+const configuredGithubUrl = normalizeAbsoluteUrl(injectedConfig.githubUrl);
 
 export function publicBaseUrl() {
   if (/^https?:\/\//i.test(baseUrl)) {
@@ -64,6 +61,10 @@ export function assetUrl(path) {
   const normalizedPath = String(path || "").replace(/^\/+/, "");
   const base = configuredAssetBase || publicBaseUrl();
   return normalizedPath ? `${base.replace(/\/+$/, "")}/${normalizedPath}` : base;
+}
+
+export function githubUrl() {
+  return configuredGithubUrl;
 }
 
 export async function copyText(text) {

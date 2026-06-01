@@ -1,5 +1,4 @@
 const ANNOUNCEMENT_STORAGE_KEY = "campusking-admin-announcement";
-const CARD_TUNING_STORAGE_KEY = "campusking-admin-card-tuning";
 const ADMIN_PASSWORD_STORAGE_KEY = "campusking-admin-password";
 const ADMIN_AUTH_STORAGE_KEY = "campusking-admin-authenticated";
 const DEFAULT_ADMIN_PASSWORD = "123";
@@ -17,20 +16,6 @@ export function loadAnnouncementMarkdown() {
 
 export function saveAnnouncementMarkdown(markdown) {
   localStorage.setItem(ANNOUNCEMENT_STORAGE_KEY, markdown || DEFAULT_ANNOUNCEMENT);
-}
-
-export function loadCardTuning() {
-  try {
-    const raw = localStorage.getItem(CARD_TUNING_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    localStorage.removeItem(CARD_TUNING_STORAGE_KEY);
-    return {};
-  }
-}
-
-export function saveCardTuning(tuning) {
-  localStorage.setItem(CARD_TUNING_STORAGE_KEY, JSON.stringify(tuning || {}));
 }
 
 export function getAdminPassword() {
@@ -59,23 +44,6 @@ export function markAdminAuthenticated() {
 
 export function clearAdminAuthentication() {
   sessionStorage.removeItem(ADMIN_AUTH_STORAGE_KEY);
-}
-
-export function applyCardTuning(cards, tuning = {}) {
-  return (cards || []).map(card => {
-    const patch = tuning[card.id];
-    if (!patch) {
-      return card;
-    }
-    return {
-      ...card,
-      attack: patch.attack ?? card.attack,
-      health: patch.health ?? card.health,
-      secondaryAttack: patch.secondaryAttack ?? card.secondaryAttack,
-      secondaryHealth: patch.secondaryHealth ?? card.secondaryHealth,
-      description: patch.description ?? card.description
-    };
-  });
 }
 
 export function renderMarkdown(markdown) {

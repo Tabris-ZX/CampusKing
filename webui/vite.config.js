@@ -22,7 +22,8 @@ export default defineConfig({
       apiBaseUrl: String(webuiConfig.apiBaseUrl || "").trim(),
       wsBaseUrl: String(webuiConfig.wsBaseUrl || "").trim(),
       wsGamePath: String(webuiConfig.wsGamePath || "/ws/game").trim(),
-      assetBaseUrl: String(webuiConfig.assetBaseUrl || "").trim()
+      assetBaseUrl: String(webuiConfig.assetBaseUrl || "").trim(),
+      githubUrl: String(webuiConfig.githubUrl || "").trim()
     })
   },
   server: {

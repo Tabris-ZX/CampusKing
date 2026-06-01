@@ -6,9 +6,11 @@ frontend:
   # baseUrl: 页面基础地址,用于生成邀请链接和 Vite 构建 base
   # apiBaseUrl: 前端运行时 API 地址,留空表示使用当前访问域名
   # wsBaseUrl: 前端运行时 WebSocket 地址,留空表示使用当前访问域名自动转换 ws/wss
+  # githubUrl: 顶部导航 GitHub 链接
   baseUrl: "/CampusKing/"
   apiBaseUrl: ""
   wsBaseUrl: ""
+  githubUrl: "https://github.com/Tabris-ZX/CampusKing"
 
 asset:
   # baseUrl: 资源公网地址,例如 COS 桶目录

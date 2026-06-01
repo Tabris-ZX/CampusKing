@@ -12,8 +12,7 @@ const DEFAULT_CONFIG = {
   wsBaseUrl: "",
   wsGamePath: "/ws/game",
   assetBaseUrl: "",
-  assetLocalRoot: "webui/public",
-  assetMaxResponseBytes: 1024 * 1024
+  githubUrl: "https://github.com/Tabris-ZX/CampusKing"
 };
 
 const KEY_ALIASES = {
@@ -21,10 +20,9 @@ const KEY_ALIASES = {
   "frontend.baseUrl": "baseUrl",
   "frontend.apiBaseUrl": "apiBaseUrl",
   "frontend.wsBaseUrl": "wsBaseUrl",
+  "frontend.githubUrl": "githubUrl",
   "websocket.gamePath": "wsGamePath",
-  "asset.baseUrl": "assetBaseUrl",
-  "asset.localRoot": "assetLocalRoot",
-  "asset.maxResponseBytes": "assetMaxResponseBytes"
+  "asset.baseUrl": "assetBaseUrl"
 };
 
 function stripInlineComment(value) {
