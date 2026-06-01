@@ -1,0 +1,5 @@
+viteApiTarget: "http://127.0.0.1:8080"
+viteWsTarget: "ws://127.0.0.1:8080"
+assetBaseUrl: ""
+assetLocalRoot: "webui/public"
+assetMaxResponseBytes: 1048576

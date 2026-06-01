@@ -5,16 +5,18 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "campusking.asset")
 public class AssetProperties {
 
-    private String baseUrl = "";
-    private String localRoot = "webui/public";
-    private int maxResponseBytes = 1024 * 1024;
+    private static final WebuiConfigFile.AssetDefaults DEFAULTS = WebuiConfigFile.loadAssetDefaults();
+
+    private String baseUrl = DEFAULTS.baseUrl();
+    private String localRoot = DEFAULTS.localRoot();
+    private int maxResponseBytes = DEFAULTS.maxResponseBytes();
 
     public String getBaseUrl() {
         return baseUrl;
     }
 
     public void setBaseUrl(String baseUrl) {
-        this.baseUrl = baseUrl == null ? "" : baseUrl.trim();
+        this.baseUrl = baseUrl == null || baseUrl.isBlank() ? DEFAULTS.baseUrl() : baseUrl.trim();
     }
 
     public String getLocalRoot() {
@@ -22,7 +24,7 @@ public class AssetProperties {
     }
 
     public void setLocalRoot(String localRoot) {
-        this.localRoot = localRoot == null || localRoot.isBlank() ? "webui/public" : localRoot.trim();
+        this.localRoot = localRoot == null || localRoot.isBlank() ? DEFAULTS.localRoot() : localRoot.trim();
     }
 
     public int getMaxResponseBytes() {
@@ -30,6 +32,6 @@ public class AssetProperties {
     }
 
     public void setMaxResponseBytes(int maxResponseBytes) {
-        this.maxResponseBytes = maxResponseBytes > 0 ? maxResponseBytes : 1024 * 1024;
+        this.maxResponseBytes = maxResponseBytes > 0 ? maxResponseBytes : DEFAULTS.maxResponseBytes();
     }
 }

@@ -2,7 +2,7 @@
 
 ~~我常常追忆过去...~~
 
-`CampusKing` 是一个基于 Spring Boot + Vue 的卡牌对战游戏
+`CampusKing` 是一个基于 Spring Boot + Vue 的肉鸽卡牌对战游戏
 
 当前项目包含：
 

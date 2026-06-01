@@ -128,24 +128,14 @@ export function cardImage(cardOrId, cardsMap = {}, assetBaseUrl = "") {
   return `${base}/api/assets/card-images/${folder}/${card.id}`;
 }
 
-export function rawCardImage(cardOrId, cardsMap = {}, assetBaseUrl = "") {
-  const card = typeof cardOrId === "string" ? cardsMap[cardOrId] : cardOrId;
-  if (!card?.id) {
-    return "";
-  }
-  const folder = card.type === "SKILL" ? "skills" : "characters";
-  const base = (assetBaseUrl || apiBase()).replace(/\/$/, "");
-  return `${base}/images/texture/${folder}/${card.id}.png`;
-}
-
 export function swapCardImageToFallback(event, cardOrId, cardsMap = {}, assetBaseUrl = "") {
   const target = event?.target;
   if (!target) {
     return false;
   }
 
-  const fallbackUrl = rawCardImage(cardOrId, cardsMap, assetBaseUrl);
-  if (!fallbackUrl) {
+  const imageUrl = cardImage(cardOrId, cardsMap, assetBaseUrl);
+  if (!imageUrl) {
     return false;
   }
 
@@ -154,6 +144,6 @@ export function swapCardImageToFallback(event, cardOrId, cardsMap = {}, assetBas
   }
 
   target.dataset.fallbackApplied = "true";
-  target.src = fallbackUrl;
+  target.src = `${imageUrl}${imageUrl.includes("?") ? "&" : "?"}retry=1`;
   return true;
 }

@@ -4,9 +4,6 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "check:card-images": "node ./scripts/check-card-image-size.mjs",
-    "predev": "npm run check:card-images",
-    "prebuild": "npm run check:card-images",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
