@@ -58,12 +58,12 @@
             <div class="battle-main-grid">
               <div class="battle-lanes">
                 <div class="battle-player-row">
-                  <div
-                    class="player-avatar"
-                    :class="playerAvatarClass(opponentPlayer)"
-                    @click="handlePlayerTarget(opponentPlayer)"
-                  >
-                    <div>{{ opponentPlayer ? "对方" : "等待" }}<br>玩家</div>
+                <div
+                  class="player-avatar"
+                  :class="playerAvatarClass(opponentPlayer)"
+                  @click="handlePlayerTarget(opponentPlayer)"
+                >
+                    <div>{{ opponentPlayerLabel }}</div>
                     <span>{{ opponentPlayer ? `${opponentPlayer.hp} / 100` : "" }}</span>
                   </div>
                   <div class="summon-zone">
@@ -114,12 +114,12 @@
                 </div>
 
                 <div class="battle-player-row">
-                  <div
-                    class="player-avatar"
-                    :class="playerAvatarClass(selfPlayer)"
-                    @click="handlePlayerTarget(selfPlayer)"
-                  >
-                    <div>{{ selfPlayer ? "我方" : "等待" }}<br>玩家</div>
+                <div
+                  class="player-avatar"
+                  :class="playerAvatarClass(selfPlayer)"
+                  @click="handlePlayerTarget(selfPlayer)"
+                >
+                    <div>{{ selfPlayerLabel }}</div>
                     <span>{{ selfPlayer ? `${selfPlayer.hp} / 100` : "" }}</span>
                   </div>
                   <div class="summon-zone">
@@ -297,6 +297,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRouter } from "vue-router";
 import AppTopbar from "../components/AppTopbar.vue";
 import { api, buildInviteLink, cardImage, describeAttack, describeEffect, describeEffectCategory, describeEffectType, describeSkillRange, describeType, getInviteBlockedReason, isMissingRoomError, swapCardImageToFallback } from "../lib/game";
+import { assetRoot, copyText, publicBaseUrl, wsGamePath, wsRoot } from "../lib/runtime-config";
 import { clearSession, ensureSessionPlayerName, loadSession, saveSession } from "../lib/session";
 import { showToast } from "../lib/toast";
 
@@ -335,9 +336,11 @@ const PHASE_TEXT = {
 const selfPlayer = computed(() => match.value?.players?.find(player => player.playerId === selfPlayerId.value) || null);
 const opponentPlayer = computed(() => match.value?.players?.find(player => player.playerId !== selfPlayerId.value) || null);
 const isMyTurn = computed(() => !!match.value && match.value.currentPlayerId === selfPlayerId.value);
+const selfPlayerLabel = computed(() => describeBattlePlayer(selfPlayer.value, "等待玩家"));
+const opponentPlayerLabel = computed(() => describeBattlePlayer(opponentPlayer.value, "等待玩家"));
 
 const connectionInfo = computed(() => {
-  return selfPlayerId.value ? `已连接 ${window.location.origin} / 身份 ${selfPlayerId.value}` : "未加入房间";
+  return selfPlayerId.value ? `已连接 ${publicBaseUrl()} / 身份 ${selfPlayerId.value}` : "未加入房间";
 });
 
 const turnInfo = computed(() => {
@@ -624,7 +627,7 @@ function processMatchAnimations(nextMatch, previousMatch) {
 
 function persistSession() {
   saveSession({
-    baseUrl: window.location.origin,
+    baseUrl: publicBaseUrl(),
     roomCode: roomCode.value,
     selfPlayerId: selfPlayerId.value,
     playerToken: playerToken.value,
@@ -666,7 +669,7 @@ function stopRealtime() {
 
 function persistNameOnlySession() {
   saveSession({
-    baseUrl: window.location.origin,
+    baseUrl: publicBaseUrl(),
     roomCode: "",
     selfPlayerId: "",
     playerToken: "",
@@ -756,6 +759,13 @@ function handCardClass(instance) {
   };
 }
 
+function describeBattlePlayer(player, fallback) {
+  if (!player) {
+    return fallback;
+  }
+  return player.playerToken === "BOT" ? "瓦库" : (player.name || fallback);
+}
+
 function handleImageError(event, cardId) {
   if (!swapCardImageToFallback(event, cardId, cardsMap.value, assetBaseUrl.value)) {
     event.target.remove();
@@ -772,7 +782,7 @@ async function copyInviteLink() {
     return;
   }
   try {
-    await navigator.clipboard.writeText(buildInviteLink(roomCode.value));
+    await copyText(buildInviteLink(roomCode.value, publicBaseUrl()));
     showToast("邀请链接已复制", "success");
   } catch {
     showToast("复制失败", "error");
@@ -814,9 +824,7 @@ function connectSocket() {
   if (socket.value) {
     socket.value.close();
   }
-  const protocol = window.location.origin.startsWith("https") ? "wss" : "ws";
-  const wsBase = window.location.origin.replace(/^https?/, protocol);
-  socket.value = new WebSocket(`${wsBase}/ws/game?roomCode=${encodeURIComponent(roomCode.value)}`);
+  socket.value = new WebSocket(`${wsRoot()}${wsGamePath()}?roomCode=${encodeURIComponent(roomCode.value)}`);
   socket.value.onmessage = event => {
     try {
       match.value = JSON.parse(event.data);
@@ -1064,7 +1072,7 @@ onMounted(async () => {
   document.addEventListener("keydown", onKeydown);
   try {
     const config = await api("/api/config");
-    assetBaseUrl.value = (config.assetBaseUrl || "").trim();
+    assetBaseUrl.value = (config.assetBaseUrl || assetRoot()).trim();
     const cards = await api("/api/cards");
     cardsMap.value = Object.fromEntries(cards.map(card => [card.id, card]));
     await restoreMatchSession();

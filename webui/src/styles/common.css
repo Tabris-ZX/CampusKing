@@ -15,6 +15,7 @@
   --radius-lg: 18px;
   --radius-md: 12px;
   --radius-sm: 8px;
+  --page-width: min(1680px, calc(100vw - 36px));
   --surface-gradient: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(246, 250, 248, 0.88));
   --hp-bg: rgba(47, 143, 138, 0.12);
   --hp-fill: linear-gradient(90deg, #67c1ae, #2f8f8a);
@@ -25,9 +26,14 @@
   font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif;
 }
 
+html {
+  overflow-y: scroll;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
+  scrollbar-gutter: stable both-edges;
   color: var(--ink);
   background:
     linear-gradient(135deg, rgba(47, 143, 138, 0.1), transparent 28%),
@@ -52,7 +58,8 @@ a {
 }
 
 .app-shell {
-  max-width: 1920px;
+  width: var(--page-width);
+  max-width: none;
   margin: 0 auto;
   padding: 16px 18px 28px;
   display: grid;
@@ -61,6 +68,8 @@ a {
 
 .topbar {
   position: relative;
+  width: 100%;
+  margin: 0 auto;
   display: grid;
   grid-template-rows: auto 1fr;
   gap: 10px;
@@ -70,7 +79,7 @@ a {
   border: 1px solid rgba(255, 255, 255, 0.26);
   background:
     linear-gradient(180deg, rgba(17, 28, 42, 0.12), rgba(17, 28, 42, 0.34)),
-    url("/images/ui/topbar.png") center center / cover no-repeat,
+    var(--topbar-image, none) center center / cover no-repeat,
     linear-gradient(135deg, #9ac7bd 0%, #6faebd 46%, #86ad61 100%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.22),
@@ -331,11 +340,33 @@ button.alt:hover {
   padding-left: 18px;
 }
 
+.markdown-body ol {
+  margin: 0 0 10px;
+  padding-left: 22px;
+}
+
 .markdown-body code {
   padding: 2px 6px;
   border-radius: 8px;
   background: rgba(19, 50, 79, 0.08);
   font-size: 12px;
+}
+
+.markdown-body pre {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(13, 32, 48, 0.92);
+  color: rgba(244, 250, 255, 0.94);
+  overflow: auto;
+}
+
+.markdown-body pre code {
+  display: block;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  white-space: pre;
 }
 
 .admin-shell {
@@ -624,6 +655,60 @@ button.disabled:hover {
   line-height: 1.7;
 }
 
+.topbar-docs-dialog {
+  width: min(1040px, calc(100vw - 32px));
+}
+
+.topbar-docs-layout {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 14px;
+  min-height: min(58vh, 620px);
+}
+
+.topbar-doc-tabs {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+.topbar-doc-tab {
+  display: grid;
+  gap: 4px;
+  justify-items: start;
+  width: 100%;
+  min-height: 72px;
+  padding: 13px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(255,255,255,0.72);
+  color: var(--ink);
+  border: 1px solid rgba(56, 102, 154, 0.14);
+  box-shadow: none;
+  text-align: left;
+}
+
+.topbar-doc-tab:hover,
+.topbar-doc-tab.active {
+  background: linear-gradient(135deg, rgba(47, 143, 138, 0.18), rgba(255,255,255,0.9));
+  color: var(--accent-dark);
+  border-color: rgba(47, 143, 138, 0.28);
+}
+
+.topbar-doc-tab span {
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.topbar-doc-tab small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.topbar-doc-content {
+  max-height: min(58vh, 620px);
+  overflow: auto;
+}
+
 .topbar-password-form {
   display: grid;
   gap: 12px;
@@ -698,5 +783,18 @@ button.disabled:hover {
 
   .topbar-dialog-head {
     flex-direction: column;
+  }
+
+  .topbar-docs-layout {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  .topbar-doc-tabs {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar-doc-tab {
+    min-height: 58px;
   }
 }

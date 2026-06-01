@@ -1,6 +1,7 @@
 package zx.campusking.service;
 
 import org.springframework.stereotype.Service;
+import zx.campusking.cards.GameCard;
 import zx.campusking.model.CardDefinition;
 import zx.campusking.model.CardInstance;
 import zx.campusking.model.MatchState;
@@ -22,12 +23,13 @@ public class DeckService {
     public List<CardInstance> buildDeck(String playerAId, String playerBId) {
         List<CardInstance> deck = new ArrayList<>();
         for (CardDefinition definition : cardCatalogService.listAll()) {
+            GameCard gameCard = cardCatalogService.requireCard(definition.getId());
             CardInstance aCard = new CardInstance(definition.getId(), playerAId, defaultHealth(definition));
-            aCard.setExtraLives(defaultExtraLives(definition));
+            aCard.setExtraLives(gameCard.extraLives());
             deck.add(aCard);
 
             CardInstance bCard = new CardInstance(definition.getId(), playerBId, defaultHealth(definition));
-            bCard.setExtraLives(defaultExtraLives(definition));
+            bCard.setExtraLives(gameCard.extraLives());
             deck.add(bCard);
         }
         return deck;
@@ -56,7 +58,4 @@ public class DeckService {
         return definition.getHealth() == null ? 0 : definition.getHealth();
     }
 
-    private int defaultExtraLives(CardDefinition definition) {
-        return definition.getSecondaryHealth() != null ? 1 : 0;
-    }
 }

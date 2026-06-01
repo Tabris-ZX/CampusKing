@@ -8,6 +8,7 @@ public class AssetProperties {
     private static final WebuiConfigFile.AssetDefaults DEFAULTS = WebuiConfigFile.loadAssetDefaults();
 
     private String baseUrl = DEFAULTS.baseUrl();
+    private String publicBaseUrl = DEFAULTS.publicBaseUrl();
     private String localRoot = DEFAULTS.localRoot();
     private int maxResponseBytes = DEFAULTS.maxResponseBytes();
 
@@ -23,8 +24,16 @@ public class AssetProperties {
         return localRoot;
     }
 
+    public String getPublicBaseUrl() {
+        return publicBaseUrl;
+    }
+
     public void setLocalRoot(String localRoot) {
         this.localRoot = localRoot == null || localRoot.isBlank() ? DEFAULTS.localRoot() : localRoot.trim();
+    }
+
+    public void setPublicBaseUrl(String publicBaseUrl) {
+        this.publicBaseUrl = publicBaseUrl == null || publicBaseUrl.isBlank() ? DEFAULTS.publicBaseUrl() : publicBaseUrl.trim();
     }
 
     public int getMaxResponseBytes() {

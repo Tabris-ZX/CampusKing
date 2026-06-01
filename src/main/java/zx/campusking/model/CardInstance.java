@@ -5,12 +5,12 @@ import lombok.Setter;
 
 import java.util.UUID;
 
-@Getter
-@Setter
 /**
  * 对局中的卡牌实例。
  * 同一张静态卡牌定义可以在不同玩家或不同对局中生成多个实例。
  */
+@Getter
+@Setter
 public class CardInstance {
 
     /** 实例唯一标识，前后端交互都依赖它。 */
@@ -30,6 +30,13 @@ public class CardInstance {
     /** 当前形态序号，0 为初始形态。 */
     private int formIndex;
 
+    /**
+     * 创建一张进入对局的卡牌实例。
+     *
+     * @param cardId 对应的静态卡牌 id
+     * @param ownerId 初始归属玩家 id
+     * @param currentHealth 初始当前生命值
+     */
     public CardInstance(String cardId, String ownerId, int currentHealth) {
         this.instanceId = UUID.randomUUID().toString();
         this.cardId = cardId;

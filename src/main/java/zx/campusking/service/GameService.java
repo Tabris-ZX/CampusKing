@@ -11,7 +11,6 @@ import zx.campusking.model.MatchState;
 import zx.campusking.model.PlayerState;
 import zx.campusking.model.dto.AttackCharacterRequest;
 import zx.campusking.model.dto.AttackPlayerRequest;
-import zx.campusking.model.dto.CreateMatchRequest;
 import zx.campusking.model.dto.CreateRoomRequest;
 import zx.campusking.model.dto.JoinRoomRequest;
 import zx.campusking.model.dto.LeaveRoomRequest;
@@ -74,35 +73,6 @@ public class GameService {
         this.statusEffectService = statusEffectService;
         this.battleService = battleService;
         this.skillResolverService = skillResolverService;
-    }
-
-    /**
-     * 旧调试入口：直接创建一个双人满员对局。
-     */
-    public MatchState createMatch(CreateMatchRequest request) {
-        MatchState match = new MatchState();
-        match.setMatchId(UUID.randomUUID().toString());
-
-        PlayerState playerA = new PlayerState("P1", matchSupportService.defaultName(request.getPlayerAName(), "玩家A"), generatePlayerToken());
-        PlayerState playerB = new PlayerState("P2", matchSupportService.defaultName(request.getPlayerBName(), "玩家B"), generatePlayerToken());
-        match.setPlayers(List.of(playerA, playerB));
-
-        List<CardInstance> deck = deckService.buildDeck(playerA.getPlayerId(), playerB.getPlayerId());
-        Collections.shuffle(deck);
-        match.setDrawPile(deck);
-        match.setPhase(GamePhase.DRAW);
-        match.setCurrentPlayerId(playerA.getPlayerId());
-        match.setTurn(1);
-        match.getLogs().add("对局已创建。");
-
-        for (int i = 0; i < 2; i++) {
-            deckService.drawOne(match, playerA);
-            deckService.drawOne(match, playerB);
-        }
-
-        matches.put(match.getMatchId(), match);
-        broadcastMatch(match);
-        return match;
     }
 
     /**
@@ -229,13 +199,6 @@ public class GameService {
     }
 
     /**
-     * 调试接口：读取当前内存中的全部对局。
-     */
-    public List<MatchState> listMatches() {
-        return new ArrayList<>(matches.values());
-    }
-
-    /**
      * 玩家自己的抽牌阶段开始时，先抽牌，再结算回合开始效果。
      */
     public MatchState drawPhase(String matchId, String playerId) {
@@ -286,8 +249,8 @@ public class GameService {
             throw new IllegalStateException("只有角色牌可以召唤。");
         }
 
-        // 普通角色下场后即可行动，只有“枪”需要休整一回合。
-        card.setSleeping(definition.getTraits() != null && definition.getTraits().contains("sniper"));
+        // 召唤后的休整规则由具体卡牌类提供，避免主流程按卡牌 id 分支。
+        card.setSleeping(cardCatalogService.requireCard(definition.getId()).sleepsOnSummon());
         player.getBoard().add(card);
         player.setSummonsThisTurn(player.getSummonsThisTurn() + 1);
         match.getLogs().add(player.getName() + " 召唤了 " + definition.getName());
@@ -456,13 +419,13 @@ public class GameService {
      * 当前只负责占位和发牌，后续可继续扩展自动出牌逻辑。
      */
     private void addBotOpponent(MatchState match) {
-        PlayerState bot = new PlayerState("P2", "机器人", "BOT");
+        PlayerState bot = new PlayerState("P2", "瓦库", "BOT");
         match.getPlayers().add(bot);
         List<CardInstance> deck = deckService.buildDeck(match.getPlayers().get(0).getPlayerId(), bot.getPlayerId());
         Collections.shuffle(deck);
         match.setDrawPile(deck);
         match.setReady(true);
-        match.getLogs().add("机器人已加入房间。");
+        match.getLogs().add("瓦库已加入房间。");
         for (int i = 0; i < 2; i++) {
             deckService.drawOne(match, match.getPlayers().get(0));
             deckService.drawOne(match, bot);
@@ -493,7 +456,7 @@ public class GameService {
         }
         wakeBoard(bot);
         match.setPhase(GamePhase.ACTION);
-        match.getLogs().add("机器人抽了 2 张牌。");
+        match.getLogs().add("瓦库抽了 2 张牌。");
 
         CardInstance firstCharacter = bot.getHand().stream()
                 .filter(card -> cardCatalogService.require(card.getCardId()).getType() == CardType.CHARACTER)
@@ -503,28 +466,27 @@ public class GameService {
         if (firstCharacter != null && bot.getBoard().size() < PlayerState.SUMMON_SLOTS) {
             CardDefinition definition = cardCatalogService.require(firstCharacter.getCardId());
             bot.getHand().remove(firstCharacter);
-            firstCharacter.setSleeping(definition.getTraits() != null && definition.getTraits().contains("sniper"));
+            firstCharacter.setSleeping(cardCatalogService.requireCard(definition.getId()).sleepsOnSummon());
             bot.getBoard().add(firstCharacter);
             bot.setSummonsThisTurn(1);
-            match.getLogs().add("机器人召唤了 " + definition.getName() + "。");
+            match.getLogs().add("瓦库召唤了 " + definition.getName() + "。");
         } else {
+            PlayerState player = matchSupportService.requirePlayer(match, "P1");
             CardInstance firstSkill = bot.getHand().stream()
                     .filter(card -> cardCatalogService.require(card.getCardId()).getType() == CardType.SKILL)
+                    .filter(card -> canBotPrepareSkill(match, bot, player, card))
                     .findFirst()
                     .orElse(null);
             if (firstSkill != null) {
-                bot.getHand().remove(firstSkill);
                 CardDefinition definition = cardCatalogService.require(firstSkill.getCardId());
-                PlayerState player = matchSupportService.requirePlayer(match, "P1");
                 PlayEffectRequest request = new PlayEffectRequest();
                 request.setPlayerId("P2");
                 request.setHandInstanceId(firstSkill.getInstanceId());
-                if (definition.getSkillRange() == null || definition.getSkillRange().name().equals("SINGLE")) {
-                    request.setTargetPlayerId("P2");
-                }
+                assignBotSkillTarget(bot, player, definition, request);
+                bot.getHand().remove(firstSkill);
                 skillResolverService.resolveEffect(match, bot, player, definition, request);
                 match.getDiscardPile().add(firstSkill);
-                match.getLogs().add("机器人使用了技能 " + definition.getName() + "。");
+                match.getLogs().add("瓦库使用了技能 " + definition.getName() + "。");
                 checkWinner(match);
             }
         }
@@ -537,8 +499,47 @@ public class GameService {
         match.setCurrentPlayerId("P1");
         match.setPhase(GamePhase.DRAW);
         match.setTurn(match.getTurn() + 1);
-        match.getLogs().add("机器人结束了回合。");
+        match.getLogs().add("瓦库结束了回合。");
         broadcastMatch(match);
+    }
+
+    private boolean canBotPrepareSkill(MatchState match, PlayerState bot, PlayerState player, CardInstance skill) {
+        CardDefinition definition = cardCatalogService.require(skill.getCardId());
+        PlayEffectRequest request = new PlayEffectRequest();
+        request.setPlayerId("P2");
+        request.setHandInstanceId(skill.getInstanceId());
+        assignBotSkillTarget(bot, player, definition, request);
+        return skillResolverService.canResolveEffect(match, bot, player, definition, request);
+    }
+
+    private void assignBotSkillTarget(PlayerState bot, PlayerState player, CardDefinition definition, PlayEffectRequest request) {
+        if (definition.getSkillRange() == null) {
+            return;
+        }
+
+        switch (definition.getSkillRange()) {
+            case SELF, BOTH -> {
+                request.setTargetPlayerId(bot.getPlayerId());
+            }
+            case ENEMY -> {
+                request.setTargetPlayerId(player.getPlayerId());
+            }
+            case SINGLE -> {
+                if ("soda".equals(definition.getId())) {
+                    if (!player.getBoard().isEmpty()) {
+                        request.setTargetPlayerId(player.getPlayerId());
+                        request.setTargetInstanceId(player.getBoard().get(0).getInstanceId());
+                        return;
+                    }
+                    if (!bot.getBoard().isEmpty()) {
+                        request.setTargetPlayerId(bot.getPlayerId());
+                        request.setTargetInstanceId(bot.getBoard().get(0).getInstanceId());
+                    }
+                    return;
+                }
+                request.setTargetPlayerId(bot.getPlayerId());
+            }
+        }
     }
 
     /**

@@ -1,205 +1,170 @@
-# 新增卡牌教程
+# 自制卡牌指南
 
-本文说明如何在当前项目里新增一张卡牌，并让它在后端规则与前端牌面中生效。
+本文说明如何在当前项目中新增一张卡牌。现在卡牌不再写在 `cards.json` 中，而是每张卡对应一个 Java 类，放在 `src/main/java/zx/campusking/cards/` 下。
 
-## 1. 明确卡牌类型
+## 1. 选择卡牌类型
 
-当前系统支持两类卡牌：
+当前卡牌分为两类：
 
-- `CHARACTER`
-  角色牌，有攻击、生命、特性。
-- `SKILL`
-  技能牌，有技能效果、数值、作用范围。
+- 角色牌：放在 `src/main/java/zx/campusking/cards/characters/`，继承 `BaseCharacterCard`
+- 技能牌：放在 `src/main/java/zx/campusking/cards/skills/`，继承 `BaseSkillCard`
 
-## 2. 在 `cards.json` 中新增定义
+卡牌扫描入口由 `config/config.yaml` 配置：
 
-文件位置：
+```yaml
+cards:
+  package: "zx.campusking.cards"
+```
 
-- `src/main/resources/cards.json`
+只要新卡类位于这个包或子包下，并实现 `GameCard`，后端启动时就会自动读入。
 
-### 角色牌示例
+## 2. 新增角色牌
 
-```json
-{
-  "id": "sample_warrior",
-  "name": "示例战士",
-  "type": "CHARACTER",
-  "description": "无特性",
-  "attack": 40,
-  "health": 80,
-  "effectType": "NONE",
-  "effectValue": 0,
-  "traits": []
+在 `cards/characters/` 下新增类，例如：
+
+```java
+package zx.campusking.cards.characters;
+
+import zx.campusking.cards.BaseCharacterCard;
+
+public final class SampleWarriorCard extends BaseCharacterCard {
+
+    public SampleWarriorCard() {
+        super(
+                140,
+                "sample_warrior",
+                "示例战士",
+                "无特性",
+                40,
+                null,
+                80,
+                null,
+                null
+        );
+    }
 }
 ```
 
-### 技能牌示例
+构造参数依次是：
 
-```json
-{
-  "id": "sample_heal",
-  "name": "示例治疗",
-  "type": "SKILL",
-  "description": "单体恢复30点生命",
-  "attack": 0,
-  "health": 0,
-  "effectType": "HEAL_BOTH",
-  "effectValue": 30,
-  "skillRange": "SINGLE",
-  "traits": []
+1. 展示顺序
+2. 卡牌 id
+3. 中文名称
+4. 描述
+5. 攻击力
+6. 攻击文本，普通数值可填 `null`
+7. 生命值
+8. 第二形态攻击力，没有则填 `null`
+9. 第二形态生命值，没有则填 `null`
+
+## 3. 新增技能牌
+
+在 `cards/skills/` 下新增类，例如：
+
+```java
+package zx.campusking.cards.skills;
+
+import zx.campusking.cards.BaseSkillCard;
+import zx.campusking.cards.CardEffectContext;
+import zx.campusking.model.EffectCategory;
+import zx.campusking.model.EffectType;
+import zx.campusking.model.SkillRange;
+
+public final class SampleHealCard extends BaseSkillCard {
+
+    public SampleHealCard() {
+        super(
+                150,
+                "sample_heal",
+                "示例治疗",
+                "恢复我方玩家 30 点生命。",
+                EffectType.NONE,
+                EffectCategory.INSTANT,
+                30,
+                0,
+                SkillRange.SELF
+        );
+    }
+
+    @Override
+    public void resolveSkill(CardEffectContext context) {
+        int maxHp = 100;
+        context.player().setHp(Math.min(maxHp, context.player().getHp() + context.value()));
+        context.match().getLogs().add(context.player().getName() + " 恢复了 " + context.value() + " 点生命。");
+    }
 }
 ```
 
-## 3. 字段说明
+技能构造参数依次是：
 
-### 通用字段
+1. 展示顺序
+2. 卡牌 id
+3. 中文名称
+4. 描述
+5. 展示用效果类型
+6. 效果分类，`INSTANT` 或 `DURATION`
+7. 效果数值
+8. 持续回合，即时效果一般为 `0`
+9. 作用范围
 
-- `id`
-  卡牌唯一 id。前后端、贴图路径、日志都依赖它。
-- `name`
-  中文显示名称。
-- `type`
-  `CHARACTER` 或 `SKILL`。
-- `description`
-  前端展示描述。
+## 4. 常用 hook
 
-### 角色牌字段
+所有卡牌都实现 `GameCard`，常用 hook 有：
 
-- `attack`
-  攻击值。
-- `health`
-  生命值。
-- `traits`
-  特性标签数组。
+- `resolveSkill(CardEffectContext context)`：技能牌效果结算入口
+- `canResolveSkill(CardEffectContext context)`：机器人出牌前判断技能是否有合法目标
+- `bypassesNegate()`：是否无视“下一张技能无效”
+- `sleepsOnSummon()`：角色上场后是否休整
+- `modifyAttack(CardCombatContext context, int attack)`：角色攻击力修正
+- `handleDefeated(CardDefeatContext context)`：角色死亡时的特殊处理
 
-当前已使用的特性有：
+优先把新卡自己的逻辑写在卡牌类里，不要在 `GameService` 或 `SkillResolverService` 里按卡牌 id 写分支。
 
-- `sniper`
-  上场首回合不能攻击。
-- `dragon`
-  攻击时追加已损失生命值；首次死亡后复活。
-- `lark`
-  当前原型里按“额外一条命”处理。
+## 5. 贴图路径
 
-### 技能牌字段
+贴图资源在 COS 桶和本地 `resources` 挂载目录下保持同样结构。
 
-- `effectType`
-  技能效果类型。
-- `effectValue`
-  技能数值。
-- `skillRange`
-  技能作用范围。
-
-当前支持的 `skillRange`：
-
-- `SINGLE`
-  单体，需要玩家额外选择目标角色或目标玩家。
-- `ALLY`
-  我方范围。
-- `BOTH`
-  双方范围。
-
-## 4. 当前支持的技能类型
-
-定义位置：
-
-- `src/main/java/zx/campusking/model/EffectType.java`
-
-当前已支持：
-
-- `NONE`
-  无效果。
-- `HEAL_BOTH`
-  治疗类效果。
-  说明：
-  如果 `skillRange=SINGLE`，会进入单体治疗逻辑。
-- `DAMAGE_ALL_ENEMIES`
-  伤害类效果。
-  说明：
-  如果 `skillRange=SINGLE`，会进入单体伤害逻辑。
-- `GLOBAL_BUFF`
-  给玩家添加持续增益。
-- `SHIELD`
-  添加护盾/挡伤害效果。
-- `COUNTER_EFFECT`
-  添加“下一张敌方技能无效”效果。
-
-## 5. 如果是新效果类型，要改哪里
-
-新增一个全新的技能效果时，通常需要同步修改这些位置：
-
-1. `src/main/java/zx/campusking/model/EffectType.java`
-
-   增加新的枚举值。
-
-2. `src/main/java/zx/campusking/service/SkillResolverService.java`
-
-   在 `resolveEffect(...)` 里补对应分支。
-
-3. 如果效果会产生持续状态：
-
-   - `src/main/java/zx/campusking/model/StatusEffectType.java`
-   - `src/main/java/zx/campusking/service/StatusEffectService.java`
-
-4. 如果前端需要更好的中文展示：
-
-   - `src/main/resources/static/app.js`
-   - `describeEffectType(...)`
-   - `describeEffect(...)`
-
-## 6. 贴图如何生效
-
-前端现在按通用规则自动找贴图，不再手写映射。
-
-### 角色牌贴图路径
+角色牌：
 
 ```text
-/texture/characters/{cardId}.png
+images/texture/characters/{cardId}.png
 ```
 
-单张卡图请控制在 `1MB` 以内，当前前端开发和构建流程会校验新增或修改的卡图体积。
-
-例如：
+技能牌：
 
 ```text
-id = dragon
-=> src/main/resources/static/texture/characters/dragon.png
+images/texture/skills/{cardId}.png
 ```
 
-### 技能牌贴图路径
+例如 `id = dragon` 的角色贴图：
 
 ```text
-/texture/skills/{cardId}.png
+images/texture/characters/dragon.png
 ```
 
-例如：
+## 6. 新增后的验证
 
-```text
-id = soda
-=> src/main/resources/static/texture/skills/soda.png
+1. 新增卡牌 Java 类
+2. 如需要，补对应贴图
+3. 如果新机制需要状态效果，补 `StatusEffectType` 和 `StatusEffectService`
+4. 运行后端测试：
+
+```bash
+bash ./mvnw test
 ```
 
-## 7. 新增卡牌后的验证步骤
+5. 运行前端构建：
 
-1. 修改 `cards.json`
-2. 如需要，补贴图文件
-3. 如果是新机制，补后端效果结算逻辑
-4. 编译验证：
-
-```powershell
-mvn "-Dmaven.repo.local=data/.m2repo" -q -DskipTests compile
+```bash
+cd webui
+npm run build
 ```
 
-5. 测试验证：
+6. 进入浏览器创建房间，实测卡牌显示和效果
 
-```powershell
-mvn "-Dmaven.repo.local=data/.m2repo" -q test
-```
+## 7. 建议
 
-6. 启动后进入浏览器，创建房间并实测卡牌表现
-
-## 8. 建议
-
-- 新卡优先复用已有 `effectType` 和 `skillRange`
-- 只有当现有规则无法表达时，再新增后端效果类型
-- 每新增一个新机制，最好同步补一条注释和一条日志，方便调试
+- 新卡优先继承 `BaseCharacterCard` 或 `BaseSkillCard`
+- 新机制优先封装进卡牌类自己的 hook
+- 多张卡共用的复杂逻辑，再考虑抽到 `CardEffectContext` 或独立服务
+- 每个新效果最好写日志，方便对局里直接看出发生了什么

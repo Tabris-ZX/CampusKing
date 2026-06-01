@@ -1,134 +1,132 @@
 # CampusKing
 
-~~我常常追忆过去...~~
-
-`CampusKing` 是一个基于 Spring Boot + Vue 的肉鸽卡牌对战游戏
+`CampusKing` 是一个基于 Spring Boot + Vue 的校园主题卡牌对战游戏原型。
 
 当前项目包含：
 
-- Java 后端：负责房间、对局状态、卡牌结算、回合流转和 WebSocket 广播
-- Vue 前端：提供首页、卡牌图鉴和对局界面
-- JSON 卡牌配置：卡牌属性和技能描述集中定义在 `src/main/resources/cards.json`
+- Java 后端：负责房间、对局状态、回合流转、卡牌结算和 WebSocket 广播。
+- Vue 前端：提供首页、卡牌大全、对局页面、公告和文档弹窗。
+- Java 卡牌类：每张卡是一个 `GameCard` 实现，位于 `src/main/java/zx/campusking/cards/`。
+- 资源目录：图片和 favicon 放在项目根目录 `resources/`，可同步到 COS 桶。
 
-## 当前实现玩法
+## 当前玩法
 
-- 双人回合制对战，支持 `PVP` 和简单 `PVE`
-- 每名玩家初始 `100 HP`
-- 每回合默认抽 `2` 张牌
-- 每名玩家有 `3` 个召唤位
-- 角色牌可召唤上场并攻击
-- 技能牌分为：
-  - `即时效果`
-  - `持续效果`
-
-当前已经实现的卡牌机制包括：
-
-- 角色攻击与直接攻击玩家
-- 护盾、反制、回血、群伤、持续增益
-- 鸟女双阶段形态
-- 龙骑首次死亡复活
-- 精灵持续两回合内死亡回复 `1/5`
+- 支持 `PVP` 双人房间和 `PVE` 人机房间。
+- 每名玩家初始 `100 HP`，每回合默认抽 `2` 张牌。
+- 每名玩家有 `3` 个召唤位，每回合最多召唤 `1` 个角色。
+- 角色牌可以攻击对方角色；对方场上没有角色时可以直接攻击玩家。
+- 技能牌由具体卡牌类实现效果，已包含护盾、反制、群伤、持续增益、抽牌换牌、弃置手牌等机制。
 
 ## 目录结构
 
 ```text
 src/main/java/zx/campusking
-├── config        # 配置类
+├── cards         # 卡牌定义与卡牌 hook
+├── config        # 配置读取、跨域和 WebSocket 配置
 ├── controller    # REST API
-├── model         # 对局模型 / DTO / 枚举
-├── service       # 核心规则与结算逻辑
+├── model         # 对局模型、DTO 和枚举
+├── service       # 房间、对局、战斗、状态、牌堆和资源服务
 └── websocket     # 房间内实时广播
 
-src/main/resources
-├── application.properties
-└── cards.json    # 卡牌静态定义
+resources
+├── favicon.ico
+└── images        # 卡图、标题图、顶部背景等静态资源
 
-WebUI
+webui
 ├── src           # Vue 前端源码
 └── package.json
 ```
 
-## 运行环境
+## 配置
 
-- `JDK 21`
-- `Node.js 18+`
-- `npm`
-- `Maven`
+主要配置在 `config/config.yaml`：
+
+```yaml
+server:
+  backendPort: 8080
+
+frontend:
+  baseUrl: "http://124.220.147.235:5173/CampusKing/#/"
+  apiBaseUrl: ""
+  wsBaseUrl: ""
+
+asset:
+  baseUrl: "https://campus-king-1367968873.cos.ap-shanghai.myqcloud.com/campus-king"
+  localRoot: "resources"
+  maxResponseBytes: 1048576
+
+cards:
+  package: "zx.campusking.cards"
+
+websocket:
+  gamePath: "/ws/game"
+```
+
+`server.backendPort` 同时控制 Spring Boot 后端端口和 Vite 本地开发代理目标端口。
+
+资源路径示例：
+
+```text
+resources/favicon.ico
+resources/images/texture/characters/dragon.png
+resources/images/texture/skills/soda.png
+```
 
 ## 快速启动
 
-### 一键启动
-根目录下的`setup.*`脚本
+后端：
 
-### 启动后端
-
-在项目根目录执行：
-
-```powershell
-mvn spring-boot:run
+```bash
+bash ./mvnw spring-boot:run
 ```
 
-默认会启动在：
+前端：
 
-```text
-http://localhost:8080
-```
-
-后端会提供：
-
-- REST API：`/api/*`
-- WebSocket：`/ws/game`
-
-### 启动前端开发环境
-
-在 `WebUI` 目录执行：
-
-```powershell
+```bash
+cd webui
 npm install
 npm run dev
 ```
 
-Vite 默认地址通常是：
+默认开发地址：
 
 ```text
-http://localhost:5173
+后端: http://localhost:8080
+前端: http://localhost:5173
 ```
 
-前端会直接请求当前页面源站的 `/api` 和 `/ws/game`，本地联调时通常需要让前端和后端处于可互通环境。
+## 构建与校验
 
-## 构建前端
+后端测试：
 
-```powershell
-cd WebUI
-npm run build
-```
-
-## 常用校验命令
-
-后端编译：
-
-```powershell
-mvn -q -DskipTests compile
+```bash
+bash ./mvnw test
 ```
 
 前端构建：
 
-```powershell
-cd WebUI
+```bash
+cd webui
 npm run build
 ```
 
-## 主要页面
+## 新增卡牌
 
-- `/`：首页
-- `/cards`：卡牌大全
-- `/battle`：对局页面
+角色牌放在：
 
-## 说明
+```text
+src/main/java/zx/campusking/cards/characters/
+```
 
-- 当前项目仍是规则原型，部分设计稿机制尚未全部落地
-- 卡牌数据以 `cards.json` 为准
-- 更详细的设计说明可参考：
-  - `doc/design.md`
-  - `doc/rule.md`
-  - `doc/how-to-add.md`
+技能牌放在：
+
+```text
+src/main/java/zx/campusking/cards/skills/
+```
+
+新增卡牌优先继承：
+
+- `BaseCharacterCard`
+- `BaseSkillCard`
+
+卡牌行为通过 `GameCard` hook 和 `CardEffectContext`、`CardCombatContext`、`CardDefeatContext` 扩展。详细说明见 `docs/how-to-add.md`，规则和设计见 `docs/rule.md`、`docs/design.md`。

@@ -1,6 +1,8 @@
 package zx.campusking.service;
 
 import org.springframework.stereotype.Service;
+import zx.campusking.cards.CardCombatContext;
+import zx.campusking.cards.CardDefeatContext;
 import zx.campusking.model.CardDefinition;
 import zx.campusking.model.CardInstance;
 import zx.campusking.model.MatchState;
@@ -49,10 +51,8 @@ public class BattleService {
         CardDefinition definition = cardCatalogService.require(cardInstance.getCardId());
         int attack = baseAttack(definition, cardInstance);
         attack += statusEffectService.sumEffectValue(owner, StatusEffectType.ATTACK_UP);
-        if (hasTrait(definition, "dragon")) {
-            attack += Math.max(0, baseHealth(definition, cardInstance) - cardInstance.getCurrentHealth());
-        }
-        return attack;
+        return cardCatalogService.requireCard(definition.getId())
+                .modifyAttack(new CardCombatContext(owner, cardInstance, definition), attack);
     }
 
     /**
@@ -68,7 +68,7 @@ public class BattleService {
 
     /**
      * 清理被击败角色。
-     * 包含龙骑首次死亡复活，以及鸟女额外命效果。
+     * 角色自身的死亡特性优先处理，然后再处理通用复活 Buff。
      */
     public void cleanupDefeated(MatchState match, PlayerState player) {
         List<CardInstance> defeated = player.getBoard().stream()
@@ -78,18 +78,8 @@ public class BattleService {
         for (CardInstance card : defeated) {
             CardDefinition definition = cardCatalogService.require(card.getCardId());
 
-            if (hasTrait(definition, "dragon") && !card.isRevived()) {
-                card.setRevived(true);
-                card.setCurrentHealth(1);
-                match.getLogs().add(definition.getName() + " 首次被击败后回复到 1 点体力。");
-                continue;
-            }
-
-            if (card.getExtraLives() > 0) {
-                card.setExtraLives(card.getExtraLives() - 1);
-                card.setFormIndex(card.getFormIndex() + 1);
-                card.setCurrentHealth(baseHealth(definition, card));
-                match.getLogs().add(definition.getName() + " 触发了额外命效果。");
+            if (cardCatalogService.requireCard(definition.getId())
+                    .handleDefeated(new CardDefeatContext(match, player, card, definition))) {
                 continue;
             }
 
@@ -113,10 +103,6 @@ public class BattleService {
      */
     public String cardName(CardInstance instance) {
         return cardCatalogService.require(instance.getCardId()).getName();
-    }
-
-    private boolean hasTrait(CardDefinition definition, String trait) {
-        return definition.getTraits() != null && definition.getTraits().contains(trait);
     }
 
     private int baseAttack(CardDefinition definition, CardInstance card) {

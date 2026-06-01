@@ -1,16 +1,17 @@
 import { EFFECT_CATEGORY_TEXT, EFFECT_TYPE_TEXT, SKILL_RANGE_TEXT, TYPE_TEXT } from "./constants";
+import { apiRoot } from "./runtime-config";
 
 export function apiBase() {
-  return window.location.origin;
+  return apiRoot();
 }
 
-export function buildInviteLink(roomCode, baseUrl = window.location.origin) {
+export function buildInviteLink(roomCode, baseUrl = apiRoot()) {
   const normalizedRoomCode = (roomCode || "").trim().toUpperCase();
   if (!normalizedRoomCode) {
     return "";
   }
-  const normalizedBaseUrl = (baseUrl || window.location.origin).replace(/\/$/, "");
-  return `${normalizedBaseUrl}?roomID=${encodeURIComponent(normalizedRoomCode)}`;
+  const normalizedBaseUrl = (baseUrl || apiRoot()).replace(/\/$/, "");
+  return `${normalizedBaseUrl}/#/?roomID=${encodeURIComponent(normalizedRoomCode)}`;
 }
 
 function playerCountOf(match) {
@@ -82,8 +83,6 @@ export function describeEffect(effect) {
       return `Buff：回合回血 +${effect.value}${suffix}`;
     case "SHIELD":
       return `Buff：护盾${stackSuffix}${suffix}`;
-    case "BLOCK_DAMAGE":
-      return `Buff：免伤${stackSuffix}${suffix}`;
     case "NEGATE_NEXT_SKILL":
       return `Debuff：对方技能无效${stackSuffix}${suffix}`;
     case "REVIVE_ON_DEATH":
@@ -124,6 +123,10 @@ export function cardImage(cardOrId, cardsMap = {}, assetBaseUrl = "") {
     return "";
   }
   const folder = card.type === "SKILL" ? "skills" : "characters";
+  const normalizedAssetBaseUrl = (assetBaseUrl || "").trim().replace(/\/$/, "");
+  if (normalizedAssetBaseUrl) {
+    return `${normalizedAssetBaseUrl}/images/texture/${folder}/${card.id}.png`;
+  }
   const base = apiBase().replace(/\/$/, "");
   return `${base}/api/assets/card-images/${folder}/${card.id}`;
 }

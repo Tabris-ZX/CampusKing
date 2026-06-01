@@ -6,6 +6,7 @@
         <RouterLink class="nav-link" :class="{ active: route.name === 'cards' }" to="/cards">卡牌大全</RouterLink>
         <RouterLink class="nav-link" :class="{ active: route.name === 'battle' }" to="/battle">对局</RouterLink>
         <button class="nav-link nav-button" type="button" @click="noticeOpen = true">公告</button>
+        <button class="nav-link nav-button" :class="{ active: docsOpen }" type="button" @click="docsOpen = true">文档</button>
         <button class="nav-link nav-button" :class="{ active: route.name === 'admin' }" type="button" @click="openAdminEntry">管理</button>
         <a class="nav-link" :href="githubUrl" target="_blank" rel="noreferrer">GitHub</a>
       </nav>
@@ -15,7 +16,7 @@
       </div>
     </div>
     <div class="brand">
-      <img class="brand-title-image" :src="`${assetPrefix}/images/ui/title.png`" alt="校园王">
+      <img class="brand-title-image" :src="titleImageUrl" alt="校园王">
       <div class="title sr-only">校园王</div>
       <div class="subtitle">{{ subtitle }}</div>
     </div>
@@ -31,6 +32,34 @@
         <button class="alt" type="button" @click="noticeOpen = false">关闭</button>
       </div>
       <div class="topbar-dialog-body markdown-body" v-html="announcementHtml"></div>
+    </section>
+  </div>
+
+  <div class="topbar-modal" :class="{ visible: docsOpen }" :aria-hidden="docsOpen ? 'false' : 'true'" @click.self="docsOpen = false">
+    <section v-if="docsOpen" class="topbar-dialog panel topbar-docs-dialog">
+      <div class="topbar-dialog-head">
+        <div>
+          <p class="eyebrow">Documents</p>
+          <h2>项目文档</h2>
+        </div>
+        <button class="alt" type="button" @click="docsOpen = false">关闭</button>
+      </div>
+      <div class="topbar-docs-layout">
+        <aside class="topbar-doc-tabs" aria-label="文档分类">
+          <button
+            v-for="doc in docs"
+            :key="doc.id"
+            class="topbar-doc-tab"
+            :class="{ active: selectedDocId === doc.id }"
+            type="button"
+            @click="selectedDocId = doc.id"
+          >
+            <span>{{ doc.label }}</span>
+            <small>{{ doc.hint }}</small>
+          </button>
+        </aside>
+        <article class="topbar-dialog-body markdown-body topbar-doc-content" v-html="selectedDocHtml"></article>
+      </div>
     </section>
   </div>
 
@@ -59,7 +88,11 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
+import designMarkdown from "../../../docs/design.md?raw";
+import howToAddMarkdown from "../../../docs/how-to-add.md?raw";
+import ruleMarkdown from "../../../docs/rule.md?raw";
 import { isAdminAuthenticated, loadAnnouncementMarkdown, markAdminAuthenticated, renderMarkdown, verifyAdminPassword } from "../lib/admin";
+import { assetUrl } from "../lib/runtime-config";
 import { ensureSessionPlayerName, loadSession } from "../lib/session";
 import { showToast } from "../lib/toast";
 
@@ -84,12 +117,36 @@ const props = defineProps({
 
 const route = useRoute();
 const router = useRouter();
-const assetPrefix = computed(() => window.location.origin);
+const titleImageUrl = computed(() => assetUrl("images/ui/title.png"));
 const githubUrl = "https://github.com/Tabris-ZX/CampusKing";
 const noticeOpen = ref(false);
+const docsOpen = ref(false);
 const adminAuthOpen = ref(false);
 const adminPassword = ref("");
 const announcementHtml = ref(renderMarkdown(loadAnnouncementMarkdown()));
+const selectedDocId = ref("rule");
+const docs = [
+  {
+    id: "rule",
+    label: "规则",
+    hint: "玩法与流程",
+    markdown: ruleMarkdown
+  },
+  {
+    id: "design",
+    label: "设计",
+    hint: "牌堆与机制",
+    markdown: designMarkdown
+  },
+  {
+    id: "how-to-add",
+    label: "自制卡牌指南",
+    hint: "新增卡牌步骤",
+    markdown: howToAddMarkdown
+  }
+];
+const selectedDoc = computed(() => docs.find(doc => doc.id === selectedDocId.value) || docs[0]);
+const selectedDocHtml = computed(() => renderMarkdown(selectedDoc.value.markdown));
 const sessionPlayerName = computed(() => {
   const session = loadSession();
   return session?.playerName || ensureSessionPlayerName(session);
@@ -118,6 +175,9 @@ function onKeydown(event) {
   }
   if (noticeOpen.value) {
     noticeOpen.value = false;
+  }
+  if (docsOpen.value) {
+    docsOpen.value = false;
   }
   if (adminAuthOpen.value) {
     closeAdminAuth();

@@ -10,6 +10,8 @@ import zx.campusking.websocket.GameWebSocketHandler;
 @EnableWebSocket
 public class WebSocketConfig implements WebSocketConfigurer {
 
+    private static final WebuiConfigFile.WebSocketDefaults DEFAULTS = WebuiConfigFile.loadWebSocketDefaults();
+
     private final GameWebSocketHandler gameWebSocketHandler;
 
     public WebSocketConfig(GameWebSocketHandler gameWebSocketHandler) {
@@ -18,6 +20,7 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        registry.addHandler(gameWebSocketHandler, "/ws/game").setAllowedOrigins("*");
+        registry.addHandler(gameWebSocketHandler, DEFAULTS.gamePath())
+                .setAllowedOrigins(DEFAULTS.allowedOrigins().toArray(String[]::new));
     }
 }

@@ -64,6 +64,22 @@ public class AssetImageService {
         return payload;
     }
 
+    public ImagePayload loadStaticAsset(String fileName) {
+        if (fileName == null || !fileName.matches("[a-zA-Z0-9_.-]+")) {
+            throw new NoSuchElementException("未知静态资源: " + fileName);
+        }
+
+        SourceImage sourceImage = readSourceImage(fileName);
+        CachedImage cachedImage = cache.get(fileName);
+        if (cachedImage != null && cachedImage.matches(sourceImage.cacheTag())) {
+            return cachedImage.payload();
+        }
+
+        ImagePayload payload = new ImagePayload(sourceImage.bytes(), sourceImage.mediaType());
+        cache.put(fileName, new CachedImage(sourceImage.cacheTag(), payload));
+        return payload;
+    }
+
     private SourceImage readSourceImage(String relativePath) {
         if (!assetProperties.getBaseUrl().isBlank()) {
             return readRemoteSource(relativePath);

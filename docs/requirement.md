@@ -89,9 +89,9 @@ campus-king-server/
 │       ├── MatchmakingService.java      # 匹配服务
 │       └── CardDefinitionService.java   # 卡牌数据加载
 │
-└── src/main/resources/
-├── application.yml
-└── cards.json                       # 卡牌数据定义文件
+└── src/main/java/zx/campusking/cards/
+    ├── characters/                  # 角色牌类
+    └── skills/                      # 技能牌类
 
 ## 游戏流程
 

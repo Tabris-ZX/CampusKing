@@ -1,0 +1,47 @@
+server:
+  # backendPort: 后端服务端口,本地 Spring Boot 和 Vite 开发代理都会使用它
+  backendPort: 8080
+
+frontend:
+  # baseUrl: 页面基础地址,用于生成邀请链接和 Vite 构建 base
+  # apiBaseUrl: 前端运行时 API 地址,留空表示使用当前访问域名
+  # wsBaseUrl: 前端运行时 WebSocket 地址,留空表示使用当前访问域名自动转换 ws/wss
+  baseUrl: "/CampusKing/"
+  apiBaseUrl: ""
+  wsBaseUrl: ""
+
+asset:
+  # baseUrl: 资源公网地址,例如 COS 桶目录
+  # localRoot: 本地资源根目录,用于后端兜底读取 favicon/图片等静态资源
+  # maxResponseBytes: 后端代理资源时允许返回的最大字节数
+  baseUrl: ""
+  localRoot: "resources"
+  maxResponseBytes: 1048576
+
+cards:
+  # package: 后端扫描卡牌类的包路径
+  package: "zx.campusking.cards"
+
+cors:
+  # allowedOriginPatterns: 允许跨域访问 API 的来源匹配规则
+  # allowedMethods: 允许跨域请求使用的 HTTP 方法
+  # allowedHeaders: 允许跨域请求携带的请求头
+  # allowCredentials: 是否允许跨域请求携带凭据
+  # maxAge: 预检请求缓存时间,单位秒
+  allowedOriginPatterns:
+    - "*"
+  allowedMethods:
+    - "GET"
+    - "POST"
+    - "OPTIONS"
+  allowedHeaders:
+    - "*"
+  allowCredentials: false
+  maxAge: 3600
+
+websocket:
+  # gamePath: 对局 WebSocket 连接路径
+  # allowedOrigins: 允许连接 WebSocket 的来源
+  gamePath: "/ws/game"
+  allowedOrigins:
+    - "*"

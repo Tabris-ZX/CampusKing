@@ -112,6 +112,7 @@ import AppTopbar from "../components/AppTopbar.vue";
 import CardTile from "../components/CardTile.vue";
 import { FILTER_TEXT } from "../lib/constants";
 import { api, cardImage, describeAttack, describeEffectCategory, describeEffectType, describeSkillRange, describeType, swapCardImageToFallback } from "../lib/game";
+import { assetRoot } from "../lib/runtime-config";
 import { showToast } from "../lib/toast";
 
 const cards = ref([]);
@@ -159,7 +160,7 @@ onMounted(async () => {
   document.addEventListener("keydown", onKeydown);
   try {
     const config = await api("/api/config");
-    assetBaseUrl.value = (config.assetBaseUrl || "").trim();
+    assetBaseUrl.value = (config.assetBaseUrl || assetRoot()).trim();
     cards.value = await api("/api/cards");
   } catch (error) {
     showToast(error.message, "error");

@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import zx.campusking.config.AssetProperties;
 import zx.campusking.service.AssetImageService;
 
+import java.lang.reflect.Field;
 import java.util.NoSuchElementException;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -15,7 +16,8 @@ class AssetControllerTests {
     @Test
     void oversizedCardImageIsCompressedBelowOneMegabyte() {
         AssetProperties properties = new AssetProperties();
-        properties.setLocalRoot("webui/public");
+        forceLocalAssets(properties);
+        properties.setLocalRoot("resources");
 
         AssetImageService service = new AssetImageService(properties);
         AssetController controller = new AssetController(service);
@@ -30,11 +32,22 @@ class AssetControllerTests {
     @Test
     void missingCardImageThrowsNotFound() {
         AssetProperties properties = new AssetProperties();
-        properties.setLocalRoot("webui/public");
+        forceLocalAssets(properties);
+        properties.setLocalRoot("resources");
 
         AssetImageService service = new AssetImageService(properties);
         AssetController controller = new AssetController(service);
 
         assertThrows(NoSuchElementException.class, () -> controller.cardImage("characters", "not-found"));
+    }
+
+    private void forceLocalAssets(AssetProperties properties) {
+        try {
+            Field field = AssetProperties.class.getDeclaredField("baseUrl");
+            field.setAccessible(true);
+            field.set(properties, "");
+        } catch (ReflectiveOperationException exception) {
+            throw new AssertionError("无法设置本地资源模式", exception);
+        }
     }
 }

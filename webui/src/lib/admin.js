@@ -80,25 +80,51 @@ export function applyCardTuning(cards, tuning = {}) {
 
 export function renderMarkdown(markdown) {
   const source = (markdown || "").replace(/\r\n/g, "\n");
-  const escaped = escapeHtml(source);
-  const lines = escaped.split("\n");
+  const lines = source.split("\n");
   const html = [];
-  let inList = false;
+  let listType = "";
+  let inCodeBlock = false;
 
   function closeList() {
-    if (inList) {
-      html.push("</ul>");
-      inList = false;
+    if (listType) {
+      html.push(`</${listType}>`);
+      listType = "";
     }
   }
 
+  function openList(nextType) {
+    if (listType === nextType) {
+      return;
+    }
+    closeList();
+    html.push(`<${nextType}>`);
+    listType = nextType;
+  }
+
   for (const rawLine of lines) {
-    const line = rawLine.trim();
+    const escapedLine = escapeHtml(rawLine);
+    const line = escapedLine.trim();
+    if (inCodeBlock) {
+      if (line.startsWith("```")) {
+        html.push("</code></pre>");
+        inCodeBlock = false;
+        continue;
+      }
+      html.push(`${escapedLine}\n`);
+      continue;
+    }
+
     if (!line) {
       closeList();
       continue;
     }
 
+    if (line.startsWith("```")) {
+      closeList();
+      html.push("<pre><code>");
+      inCodeBlock = true;
+      continue;
+    }
     if (line.startsWith("### ")) {
       closeList();
       html.push(`<h3>${inlineMarkdown(line.slice(4))}</h3>`);
@@ -115,11 +141,13 @@ export function renderMarkdown(markdown) {
       continue;
     }
     if (line.startsWith("- ")) {
-      if (!inList) {
-        html.push("<ul>");
-        inList = true;
-      }
+      openList("ul");
       html.push(`<li>${inlineMarkdown(line.slice(2))}</li>`);
+      continue;
+    }
+    if (/^\d+\.\s+/.test(line)) {
+      openList("ol");
+      html.push(`<li>${inlineMarkdown(line.replace(/^\d+\.\s+/, ""))}</li>`);
       continue;
     }
 
@@ -128,6 +156,9 @@ export function renderMarkdown(markdown) {
   }
 
   closeList();
+  if (inCodeBlock) {
+    html.push("</code></pre>");
+  }
   return html.join("");
 }
 

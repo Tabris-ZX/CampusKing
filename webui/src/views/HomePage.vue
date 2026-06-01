@@ -99,7 +99,7 @@
         </div>
       </form>
 
-      <form v-else class="entry-form" @submit.prevent="joinRoom">
+      <form v-else class="entry-form" @submit.prevent="joinRoomFromForm">
         <p class="eyebrow">Join</p>
         <h2>加入房间</h2>
         <p class="entry-copy">输入房主提供的房间码后进入对局。</p>
@@ -119,12 +119,13 @@ import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import AppTopbar from "../components/AppTopbar.vue";
 import { api, buildInviteLink, getInviteBlockedReason, isMissingRoomError } from "../lib/game";
+import { copyText, publicBaseUrl } from "../lib/runtime-config";
 import { clearSession, ensureSessionPlayerName, generateClientToken, loadSession, saveSession } from "../lib/session";
 import { showToast } from "../lib/toast";
 
 const router = useRouter();
 const session = ref({
-  baseUrl: window.location.origin,
+  baseUrl: publicBaseUrl(),
   roomCode: "",
   selfPlayerId: "",
   playerToken: "",
@@ -204,7 +205,7 @@ async function createRoom() {
       })
     });
     session.value = {
-      baseUrl: window.location.origin,
+      baseUrl: publicBaseUrl(),
       roomCode: match.roomCode,
       selfPlayerId: "P1",
       playerToken,
@@ -226,7 +227,8 @@ async function joinRoom(roomCodeOverride = "", options = {}) {
     if (!playerName) {
       return false;
     }
-    const roomCode = (roomCodeOverride || roomCodeInput.value).trim().toUpperCase();
+    const roomCodeSource = typeof roomCodeOverride === "string" ? roomCodeOverride : roomCodeInput.value;
+    const roomCode = String(roomCodeSource || "").trim().toUpperCase();
     if (!roomCode) {
       showToast("请输入房间码", "error");
       return false;
@@ -237,7 +239,7 @@ async function joinRoom(roomCodeOverride = "", options = {}) {
       body: JSON.stringify({ playerName, playerToken })
     });
     session.value = {
-      baseUrl: window.location.origin,
+      baseUrl: publicBaseUrl(),
       roomCode,
       selfPlayerId: "P2",
       playerToken,
@@ -259,13 +261,21 @@ async function joinRoom(roomCodeOverride = "", options = {}) {
   }
 }
 
+async function joinRoomFromForm(event) {
+  const formValue = event?.currentTarget?.elements?.roomCodeInput?.value || "";
+  if (formValue) {
+    roomCodeInput.value = formValue;
+  }
+  return joinRoom(formValue);
+}
+
 async function copyRoomCode() {
   if (!session.value.roomCode) {
     showToast("当前没有房间码", "error");
     return;
   }
   try {
-    await navigator.clipboard.writeText(session.value.roomCode);
+    await copyText(session.value.roomCode);
     showToast("房间码已复制", "success");
   } catch {
     showToast("复制失败", "error");
@@ -282,7 +292,7 @@ async function copyInviteLink() {
     return;
   }
   try {
-    await navigator.clipboard.writeText(buildInviteLink(session.value.roomCode, session.value.baseUrl || window.location.origin));
+    await copyText(buildInviteLink(session.value.roomCode, session.value.baseUrl || publicBaseUrl()));
     showToast("邀请链接已复制", "success");
   } catch {
     showToast("复制失败", "error");
@@ -290,16 +300,39 @@ async function copyInviteLink() {
 }
 
 function readInviteRoomCode() {
-  const roomCode = new URLSearchParams(window.location.search).get("roomID");
-  return (roomCode || "").trim().toUpperCase();
+  const searchRoomCode = new URLSearchParams(window.location.search).get("roomID");
+  if (searchRoomCode) {
+    return searchRoomCode.trim().toUpperCase();
+  }
+  const hash = window.location.hash || "";
+  const hashQueryIndex = hash.indexOf("?");
+  if (hashQueryIndex < 0) {
+    return "";
+  }
+  const hashRoomCode = new URLSearchParams(hash.slice(hashQueryIndex + 1)).get("roomID");
+  return (hashRoomCode || "").trim().toUpperCase();
 }
 
 function clearInviteRoomCode() {
   const currentUrl = new URL(window.location.href);
-  if (!currentUrl.searchParams.has("roomID")) {
+  let updated = false;
+  if (currentUrl.searchParams.has("roomID")) {
+    currentUrl.searchParams.delete("roomID");
+    updated = true;
+  }
+  if (currentUrl.hash.includes("?")) {
+    const [hashPath, hashQuery = ""] = currentUrl.hash.slice(1).split("?");
+    const params = new URLSearchParams(hashQuery);
+    if (params.has("roomID")) {
+      params.delete("roomID");
+      const nextHashQuery = params.toString();
+      currentUrl.hash = nextHashQuery ? `#${hashPath}?${nextHashQuery}` : `#${hashPath}`;
+      updated = true;
+    }
+  }
+  if (!updated) {
     return;
   }
-  currentUrl.searchParams.delete("roomID");
   const nextUrl = `${currentUrl.origin}${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`;
   window.history.replaceState({}, "", nextUrl);
 }
@@ -337,7 +370,7 @@ async function handleInviteJoin() {
       if (isMissingRoomError(error)) {
         clearSession();
         session.value = {
-          baseUrl: window.location.origin,
+          baseUrl: publicBaseUrl(),
           roomCode: "",
           selfPlayerId: "",
           playerToken: "",
@@ -368,7 +401,7 @@ onMounted(async () => {
   const saved = loadSession();
   if (saved) {
     session.value = {
-      baseUrl: saved.baseUrl || window.location.origin,
+      baseUrl: saved.baseUrl || publicBaseUrl(),
       roomCode: saved.roomCode || "",
       selfPlayerId: saved.selfPlayerId || "",
       playerToken: saved.playerToken || "",
@@ -383,7 +416,7 @@ onMounted(async () => {
         if (isMissingRoomError(error)) {
           clearSession();
           session.value = {
-            baseUrl: window.location.origin,
+            baseUrl: publicBaseUrl(),
             roomCode: "",
             selfPlayerId: "",
             playerToken: "",

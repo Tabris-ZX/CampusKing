@@ -15,7 +15,6 @@ export const TYPE_TEXT = {
 export const SKILL_RANGE_TEXT = {
   SINGLE: "单体",
   SELF: "自身",
-  ALLY: "我方",
   ENEMY: "敌方",
   BOTH: "双方"
 };
@@ -23,7 +22,6 @@ export const SKILL_RANGE_TEXT = {
 export const EFFECT_TYPE_TEXT = {
   GLOBAL_BUFF: "增益",
   SHIELD: "护盾",
-  HEAL_BOTH: "治疗",
   DAMAGE_ALL_ENEMIES: "伤害",
   COUNTER_EFFECT: "反制",
   DRAW_AND_MODIFY_UNIT: "抽牌与单位改动",
