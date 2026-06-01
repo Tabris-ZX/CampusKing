@@ -22,6 +22,7 @@ export default defineConfig({
         ws: true,
         changeOrigin: true
       }
-    }
+    },
+    open: false
   }
 });

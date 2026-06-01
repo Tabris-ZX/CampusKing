@@ -4,6 +4,42 @@ export function apiBase() {
   return window.location.origin;
 }
 
+export function buildInviteLink(roomCode, baseUrl = window.location.origin) {
+  const normalizedRoomCode = (roomCode || "").trim().toUpperCase();
+  if (!normalizedRoomCode) {
+    return "";
+  }
+  const normalizedBaseUrl = (baseUrl || window.location.origin).replace(/\/$/, "");
+  return `${normalizedBaseUrl}?roomID=${encodeURIComponent(normalizedRoomCode)}`;
+}
+
+function playerCountOf(match) {
+  if (Number.isFinite(Number(match?.playerCount))) {
+    return Number(match.playerCount);
+  }
+  return Array.isArray(match?.players) ? match.players.length : 0;
+}
+
+export function getInviteBlockedReason(match) {
+  if (!match) {
+    return "对局数据未同步，暂时无法复制邀请链接。";
+  }
+  if (match.phase === "FINISHED") {
+    return "对局已结束，无法邀请其他玩家。";
+  }
+  if (match.mode === "PVE") {
+    return "人机局已满，无法邀请其他玩家。";
+  }
+  if (playerCountOf(match) >= 2) {
+    return "房间已满，无法邀请其他玩家。";
+  }
+  return "";
+}
+
+export function isMissingRoomError(error) {
+  return error?.status === 404 && (error.message || "").includes("房间不存在");
+}
+
 export async function api(path, options = {}) {
   const response = await fetch(`${apiBase()}${path}`, {
     headers: { "Content-Type": "application/json" },
@@ -11,7 +47,9 @@ export async function api(path, options = {}) {
   });
   const data = await response.json();
   if (!response.ok) {
-    throw new Error(data.error || "请求失败");
+    const error = new Error(data.error || "请求失败");
+    error.status = response.status;
+    throw error;
   }
   return data;
 }
@@ -86,6 +124,36 @@ export function cardImage(cardOrId, cardsMap = {}, assetBaseUrl = "") {
     return "";
   }
   const folder = card.type === "SKILL" ? "skills" : "characters";
+  const base = apiBase().replace(/\/$/, "");
+  return `${base}/api/assets/card-images/${folder}/${card.id}`;
+}
+
+export function rawCardImage(cardOrId, cardsMap = {}, assetBaseUrl = "") {
+  const card = typeof cardOrId === "string" ? cardsMap[cardOrId] : cardOrId;
+  if (!card?.id) {
+    return "";
+  }
+  const folder = card.type === "SKILL" ? "skills" : "characters";
   const base = (assetBaseUrl || apiBase()).replace(/\/$/, "");
   return `${base}/images/texture/${folder}/${card.id}.png`;
+}
+
+export function swapCardImageToFallback(event, cardOrId, cardsMap = {}, assetBaseUrl = "") {
+  const target = event?.target;
+  if (!target) {
+    return false;
+  }
+
+  const fallbackUrl = rawCardImage(cardOrId, cardsMap, assetBaseUrl);
+  if (!fallbackUrl) {
+    return false;
+  }
+
+  if (target.dataset.fallbackApplied === "true") {
+    return false;
+  }
+
+  target.dataset.fallbackApplied = "true";
+  target.src = fallbackUrl;
+  return true;
 }

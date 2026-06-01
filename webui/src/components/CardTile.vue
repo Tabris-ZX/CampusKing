@@ -1,7 +1,7 @@
 <template>
   <article class="catalog-card panel" @dblclick="$emit('preview', card)">
     <div class="catalog-art" :class="{ 'no-image': imageFailed || !image }">
-      <img v-if="image && !imageFailed" :src="image" :alt="card.name" @error="imageFailed = true">
+      <img v-if="image && !imageFailed" :src="image" :alt="card.name" @error="handleImageError">
     </div>
     <div class="catalog-info">
       <div class="catalog-head">
@@ -29,7 +29,7 @@
 
 <script setup>
 import { computed, ref } from "vue";
-import { cardImage, describeAttack, describeEffectCategory, describeEffectType, describeSkillRange, describeType } from "../lib/game";
+import { cardImage, describeAttack, describeEffectCategory, describeEffectType, describeSkillRange, describeType, swapCardImageToFallback } from "../lib/game";
 
 const props = defineProps({
   card: {
@@ -46,4 +46,10 @@ defineEmits(["preview"]);
 
 const imageFailed = ref(false);
 const image = computed(() => cardImage(props.card, {}, props.assetBaseUrl));
+
+function handleImageError(event) {
+  if (!swapCardImageToFallback(event, props.card, {}, props.assetBaseUrl)) {
+    imageFailed.value = true;
+  }
+}
 </script>

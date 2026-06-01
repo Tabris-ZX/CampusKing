@@ -157,6 +157,8 @@
 /texture/characters/{cardId}.png
 ```
 
+单张卡图请控制在 `1MB` 以内，当前前端开发和构建流程会校验新增或修改的卡图体积。
+
 例如：
 
 ```text

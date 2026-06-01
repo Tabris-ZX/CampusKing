@@ -12,6 +12,16 @@
                 <span class="battle-headline-label">对局状态</span>
                 <strong>{{ battleHeadline }}</strong>
                 <span class="battle-headline-subtext">{{ battleSubtext }}</span>
+                <div class="battle-headline-actions">
+                  <button
+                    class="alt battle-inline-action"
+                    :disabled="!canCopyInviteLink"
+                    :title="inviteBlockedReason"
+                    @click="copyInviteLink"
+                  >
+                    复制邀请链接
+                  </button>
+                </div>
               </div>
               <div class="effect-summary">
                 <div class="compact-effects">
@@ -81,7 +91,7 @@
                               v-if="cardImageFor(slot.card.cardId)"
                               :src="cardImageFor(slot.card.cardId)"
                               :alt="cardDef(slot.card.cardId).name"
-                              @error="handleImageError"
+                              @error="handleImageError($event, slot.card.cardId)"
                             >
                           </div>
                           <div class="card-overlay"></div>
@@ -137,7 +147,7 @@
                               v-if="cardImageFor(slot.card.cardId)"
                               :src="cardImageFor(slot.card.cardId)"
                               :alt="cardDef(slot.card.cardId).name"
-                              @error="handleImageError"
+                              @error="handleImageError($event, slot.card.cardId)"
                             >
                           </div>
                           <div class="card-overlay"></div>
@@ -205,7 +215,7 @@
                           v-if="cardImageFor(card.cardId)"
                           :src="cardImageFor(card.cardId)"
                           :alt="cardDef(card.cardId).name"
-                          @error="handleImageError"
+                          @error="handleImageError($event, card.cardId)"
                         >
                       </div>
                       <div class="card-overlay"></div>
@@ -251,7 +261,7 @@
       <button class="detail-close alt" type="button" @click="detailCard = null">关闭</button>
       <div class="card-surface">
         <div class="card-figure" :class="{ 'no-image': !detailImage }" :data-mark="detailMark">
-          <img v-if="detailImage" :src="detailImage" :alt="detailDefinition.name" @error="handleImageError">
+          <img v-if="detailImage" :src="detailImage" :alt="detailDefinition.name" @error="handleImageError($event, detailCard?.cardId || detailCard?.id)">
         </div>
         <div class="card-overlay"></div>
         <div class="card-body">
@@ -286,8 +296,8 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import AppTopbar from "../components/AppTopbar.vue";
-import { api, cardImage, describeAttack, describeEffect, describeEffectCategory, describeEffectType, describeSkillRange, describeType } from "../lib/game";
-import { clearSession, loadSession, saveSession } from "../lib/session";
+import { api, buildInviteLink, cardImage, describeAttack, describeEffect, describeEffectCategory, describeEffectType, describeSkillRange, describeType, getInviteBlockedReason, isMissingRoomError, swapCardImageToFallback } from "../lib/game";
+import { clearSession, ensureSessionPlayerName, loadSession, saveSession } from "../lib/session";
 import { showToast } from "../lib/toast";
 
 const router = useRouter();
@@ -428,6 +438,13 @@ const selfSlots = computed(() => {
 const opponentEffects = computed(() => toEffectBadges(opponentPlayer.value));
 const selfEffects = computed(() => toEffectBadges(selfPlayer.value));
 const battleLogs = computed(() => match.value?.logs || []);
+const inviteBlockedReason = computed(() => {
+  if (!roomCode.value) {
+    return "当前没有可分享的房间";
+  }
+  return getInviteBlockedReason(match.value);
+});
+const canCopyInviteLink = computed(() => !!roomCode.value && !inviteBlockedReason.value);
 const battleHeadline = computed(() => {
   if (!match.value) {
     return "等待对局开始";
@@ -657,6 +674,16 @@ function persistNameOnlySession() {
   });
 }
 
+function clearInvalidBattleSession() {
+  stopRealtime();
+  resetLocalBattleState();
+  if (playerName.value) {
+    persistNameOnlySession();
+  } else {
+    clearSession();
+  }
+}
+
 async function leaveBattle({ remote = true, silent = false } = {}) {
   if (leavingBattle.value) {
     return;
@@ -729,15 +756,43 @@ function handCardClass(instance) {
   };
 }
 
-function handleImageError(event) {
-  event.target.remove();
+function handleImageError(event, cardId) {
+  if (!swapCardImageToFallback(event, cardId, cardsMap.value, assetBaseUrl.value)) {
+    event.target.remove();
+  }
+}
+
+async function copyInviteLink() {
+  if (!roomCode.value) {
+    showToast("当前没有可分享的房间", "error");
+    return;
+  }
+  if (inviteBlockedReason.value) {
+    showToast(inviteBlockedReason.value, "error");
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(buildInviteLink(roomCode.value));
+    showToast("邀请链接已复制", "success");
+  } catch {
+    showToast("复制失败", "error");
+  }
 }
 
 async function refreshRoom() {
   if (!roomCode.value) {
     return;
   }
-  match.value = await api(`/api/rooms/${roomCode.value}`);
+  try {
+    match.value = await api(`/api/rooms/${roomCode.value}`);
+  } catch (error) {
+    if (isMissingRoomError(error)) {
+      clearInvalidBattleSession();
+      showToast("房间不存在，已清理本地会话。", "error");
+      return;
+    }
+    throw error;
+  }
 }
 
 function startPolling() {
@@ -779,7 +834,7 @@ async function restoreMatchSession() {
   roomCode.value = saved.roomCode;
   selfPlayerId.value = saved.selfPlayerId || "";
   playerToken.value = saved.playerToken;
-  playerName.value = saved.playerName || "";
+  playerName.value = saved.playerName || ensureSessionPlayerName(saved);
   try {
     const session = await api(`/api/rooms/${roomCode.value}/session/${playerToken.value}`);
     match.value = session.match;
@@ -789,13 +844,13 @@ async function restoreMatchSession() {
     startPolling();
     persistSession();
     showToast("已恢复上次会话", "success");
-  } catch {
-    clearSession();
-    roomCode.value = "";
-    selfPlayerId.value = "";
-    playerToken.value = "";
-    playerName.value = "";
-    match.value = null;
+  } catch (error) {
+    if (isMissingRoomError(error)) {
+      clearInvalidBattleSession();
+      showToast("房间不存在，已清理本地会话。", "error");
+    } else {
+      showToast(error.message, "error");
+    }
   }
 }
 

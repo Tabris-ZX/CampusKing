@@ -1,9 +1,6 @@
 <template>
   <main class="app-shell home-shell">
-    <AppTopbar
-      extra-class="home-topbar"
-      :status="topbarStatus"
-     subtitle="Campus King"/>
+    <AppTopbar extra-class="home-topbar" subtitle="Campus King"/>
 
     <section class="home-hero panel">
       <div class="home-hero-copy">
@@ -30,7 +27,10 @@
         <p class="profile-help">后续会改为数据库保存；现在先保存在浏览器会话里。</p>
         <div class="profile-meta">
           <span>{{ session.roomCode ? `当前房间 ${session.roomCode}` : "当前未加入房间" }}</span>
-          <button class="alt" type="button" @click="copyRoomCode">复制房间码</button>
+          <div class="profile-meta-actions">
+            <button class="alt" type="button" @click="copyRoomCode">复制房间码</button>
+            <button class="alt" type="button" :disabled="!canCopyInviteLink" :title="inviteBlockedReason" @click="copyInviteLink">复制邀请链接</button>
+          </div>
         </div>
       </aside>
     </section>
@@ -118,8 +118,8 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink, useRouter } from "vue-router";
 import AppTopbar from "../components/AppTopbar.vue";
-import { api } from "../lib/game";
-import { generateClientToken, loadSession, saveSession } from "../lib/session";
+import { api, buildInviteLink, getInviteBlockedReason, isMissingRoomError } from "../lib/game";
+import { clearSession, ensureSessionPlayerName, generateClientToken, loadSession, saveSession } from "../lib/session";
 import { showToast } from "../lib/toast";
 
 const router = useRouter();
@@ -130,24 +130,32 @@ const session = ref({
   playerToken: "",
   playerName: ""
 });
+const currentMatch = ref(null);
 const playerNameInput = ref("");
 const roomCodeInput = ref("");
 const botMode = ref(false);
 const entryMode = ref("");
 
-const displayPlayerName = computed(() => playerNameInput.value || session.value.playerName || "未命名玩家");
-const topbarStatus = computed(() => `玩家 ${displayPlayerName.value}`);
+const displayPlayerName = computed(() => playerNameInput.value || session.value.playerName || ensureSessionPlayerName(session.value));
+const topbarStatus = computed(() => `${displayPlayerName.value}`);
 const connectionInfo = computed(() => {
   if (!session.value.roomCode) {
     return "未加入房间";
   }
   return `已有会话：${session.value.roomCode} / ${session.value.selfPlayerId || "未知身份"}`;
 });
+const inviteBlockedReason = computed(() => {
+  if (!session.value.roomCode) {
+    return "当前没有可分享的房间";
+  }
+  return getInviteBlockedReason(currentMatch.value);
+});
+const canCopyInviteLink = computed(() => !!session.value.roomCode && !inviteBlockedReason.value);
 
 watch(playerNameInput, value => {
   session.value = {
     ...session.value,
-    playerName: value || ""
+    playerName: value || ensureSessionPlayerName(session.value)
   };
   saveSession(session.value);
 });
@@ -157,11 +165,15 @@ function persist() {
 }
 
 function ensurePlayerName() {
-  const name = playerNameInput.value.trim();
-  if (!name) {
-    showToast("请先输入你的名字", "error");
-    return "";
+  const name = playerNameInput.value.trim() || session.value.playerName || ensureSessionPlayerName(session.value);
+  if (!playerNameInput.value.trim()) {
+    playerNameInput.value = name;
   }
+  session.value = {
+    ...session.value,
+    playerName: name
+  };
+  saveSession(session.value);
   return name;
 }
 
@@ -198,6 +210,7 @@ async function createRoom() {
       playerToken,
       playerName
     };
+    currentMatch.value = match;
     persist();
     closeEntryModal();
     router.push("/battle");
@@ -206,19 +219,20 @@ async function createRoom() {
   }
 }
 
-async function joinRoom() {
+async function joinRoom(roomCodeOverride = "", options = {}) {
+  const { closeModalOnSuccess = true, successMessage = "" } = options;
   try {
     const playerName = ensurePlayerName();
     if (!playerName) {
-      return;
+      return false;
     }
-    const roomCode = roomCodeInput.value.trim().toUpperCase();
+    const roomCode = (roomCodeOverride || roomCodeInput.value).trim().toUpperCase();
     if (!roomCode) {
       showToast("请输入房间码", "error");
-      return;
+      return false;
     }
     const playerToken = generateClientToken();
-    await api(`/api/rooms/${roomCode}/join`, {
+    const match = await api(`/api/rooms/${roomCode}/join`, {
       method: "POST",
       body: JSON.stringify({ playerName, playerToken })
     });
@@ -229,11 +243,19 @@ async function joinRoom() {
       playerToken,
       playerName
     };
+    currentMatch.value = match;
     persist();
-    closeEntryModal();
+    if (closeModalOnSuccess) {
+      closeEntryModal();
+    }
+    if (successMessage) {
+      showToast(successMessage, "success");
+    }
     router.push("/battle");
+    return true;
   } catch (error) {
     showToast(error.message, "error");
+    return false;
   }
 }
 
@@ -250,19 +272,128 @@ async function copyRoomCode() {
   }
 }
 
-onMounted(() => {
-  const saved = loadSession();
-  if (!saved) {
+async function copyInviteLink() {
+  if (!session.value.roomCode) {
+    showToast("当前没有可分享的房间", "error");
     return;
   }
-  session.value = {
-    baseUrl: saved.baseUrl || window.location.origin,
-    roomCode: saved.roomCode || "",
-    selfPlayerId: saved.selfPlayerId || "",
-    playerToken: saved.playerToken || "",
-    playerName: saved.playerName || ""
-  };
-  playerNameInput.value = session.value.playerName;
-  roomCodeInput.value = session.value.roomCode;
+  if (inviteBlockedReason.value) {
+    showToast(inviteBlockedReason.value, "error");
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(buildInviteLink(session.value.roomCode, session.value.baseUrl || window.location.origin));
+    showToast("邀请链接已复制", "success");
+  } catch {
+    showToast("复制失败", "error");
+  }
+}
+
+function readInviteRoomCode() {
+  const roomCode = new URLSearchParams(window.location.search).get("roomID");
+  return (roomCode || "").trim().toUpperCase();
+}
+
+function clearInviteRoomCode() {
+  const currentUrl = new URL(window.location.href);
+  if (!currentUrl.searchParams.has("roomID")) {
+    return;
+  }
+  currentUrl.searchParams.delete("roomID");
+  const nextUrl = `${currentUrl.origin}${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`;
+  window.history.replaceState({}, "", nextUrl);
+}
+
+async function leavePreviousRoomIfNeeded(nextRoomCode) {
+  const saved = loadSession();
+  if (!saved?.roomCode || !saved?.playerToken || saved.roomCode === nextRoomCode) {
+    return;
+  }
+  try {
+    await api(`/api/rooms/${saved.roomCode}/leave`, {
+      method: "POST",
+      body: JSON.stringify({ playerToken: saved.playerToken })
+    });
+  } catch {
+  }
+}
+
+async function handleInviteJoin() {
+  const inviteRoomCode = readInviteRoomCode();
+  if (!inviteRoomCode) {
+    return;
+  }
+
+  roomCodeInput.value = inviteRoomCode;
+  clearInviteRoomCode();
+
+  const saved = loadSession();
+  if (saved?.roomCode === inviteRoomCode && saved?.playerToken) {
+    try {
+      await api(`/api/rooms/${inviteRoomCode}/session/${saved.playerToken}`);
+      showToast("检测到邀请链接，正在恢复房间", "success");
+      router.replace("/battle");
+    } catch (error) {
+      if (isMissingRoomError(error)) {
+        clearSession();
+        session.value = {
+          baseUrl: window.location.origin,
+          roomCode: "",
+          selfPlayerId: "",
+          playerToken: "",
+          playerName: ensureSessionPlayerName(saved)
+        };
+        playerNameInput.value = session.value.playerName;
+        roomCodeInput.value = inviteRoomCode;
+        showToast("邀请房间不存在，请确认房间码。", "error");
+      } else {
+        showToast(error.message, "error");
+      }
+    }
+    return;
+  }
+
+  await leavePreviousRoomIfNeeded(inviteRoomCode);
+  const joined = await joinRoom(inviteRoomCode, {
+    closeModalOnSuccess: false,
+    successMessage: `已通过邀请链接加入房间 ${inviteRoomCode}`
+  });
+
+  if (!joined) {
+    entryMode.value = "join";
+  }
+}
+
+onMounted(async () => {
+  const saved = loadSession();
+  if (saved) {
+    session.value = {
+      baseUrl: saved.baseUrl || window.location.origin,
+      roomCode: saved.roomCode || "",
+      selfPlayerId: saved.selfPlayerId || "",
+      playerToken: saved.playerToken || "",
+      playerName: saved.playerName || ensureSessionPlayerName(saved)
+    };
+    playerNameInput.value = session.value.playerName;
+    roomCodeInput.value = session.value.roomCode;
+    if (session.value.roomCode) {
+      try {
+        currentMatch.value = await api(`/api/rooms/${session.value.roomCode}`);
+      } catch (error) {
+        if (isMissingRoomError(error)) {
+          clearSession();
+          session.value = {
+            baseUrl: window.location.origin,
+            roomCode: "",
+            selfPlayerId: "",
+            playerToken: "",
+            playerName: playerNameInput.value
+          };
+          roomCodeInput.value = "";
+        }
+      }
+    }
+  }
+  await handleInviteJoin();
 });
 </script>

@@ -4,13 +4,16 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "check:card-images": "node ./scripts/check-card-image-size.mjs",
+    "predev": "npm run check:card-images",
+    "prebuild": "npm run check:card-images",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
     "vue": "^3.5.13",
-    "vue-router": "^4.5.1"
+    "vue-router": "4.2.5"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.2.3",

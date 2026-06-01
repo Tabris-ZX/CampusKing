@@ -63,7 +63,7 @@
     <div v-if="previewCard" class="card-preview-dialog panel">
       <button class="card-preview-close alt" type="button" @click="previewCard = null">关闭</button>
       <div class="card-preview-media" :class="{ 'no-image': previewImageFailed || !previewImage }">
-        <img v-if="previewImage && !previewImageFailed" :src="previewImage" :alt="previewCard.name" @error="previewImageFailed = true">
+        <img v-if="previewImage && !previewImageFailed" :src="previewImage" :alt="previewCard.name" @error="handlePreviewImageError">
       </div>
       <div class="card-preview-info">
         <div class="card-preview-head">
@@ -111,7 +111,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import AppTopbar from "../components/AppTopbar.vue";
 import CardTile from "../components/CardTile.vue";
 import { FILTER_TEXT } from "../lib/constants";
-import { api, cardImage, describeAttack, describeEffectCategory, describeEffectType, describeSkillRange, describeType } from "../lib/game";
+import { api, cardImage, describeAttack, describeEffectCategory, describeEffectType, describeSkillRange, describeType, swapCardImageToFallback } from "../lib/game";
 import { showToast } from "../lib/toast";
 
 const cards = ref([]);
@@ -146,6 +146,12 @@ watch(previewCard, () => {
 function onKeydown(event) {
   if (event.key === "Escape" && previewCard.value) {
     previewCard.value = null;
+  }
+}
+
+function handlePreviewImageError(event) {
+  if (!previewCard.value || !swapCardImageToFallback(event, previewCard.value, {}, assetBaseUrl.value)) {
+    previewImageFailed.value = true;
   }
 }
 

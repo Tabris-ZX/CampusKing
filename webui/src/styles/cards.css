@@ -1,27 +1,27 @@
 .cards-shell {
   max-width: 1480px;
-  gap: 18px;
+  gap: 16px;
 }
 
 .cards-hero {
-  padding: clamp(24px, 4vw, 44px);
+  padding: clamp(22px, 4vw, 36px);
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 24px;
   align-items: end;
   overflow: hidden;
   position: relative;
-  border-radius: 28px;
+  border-radius: var(--radius-lg);
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(232, 243, 255, 0.98)),
+    var(--surface-gradient),
     var(--panel);
 }
 
 .cards-hero h1 {
   margin: 0;
-  font-size: clamp(34px, 5vw, 70px);
-  line-height: 0.94;
-  letter-spacing: -0.04em;
+  font-size: clamp(34px, 5vw, 56px);
+  line-height: 1.04;
+  letter-spacing: 0;
 }
 
 .cards-filter {
@@ -40,7 +40,7 @@
 .cards-filter button.active {
   background: var(--accent);
   color: #fff;
-  box-shadow: 0 10px 24px rgba(79, 134, 217, 0.24);
+  box-shadow: 0 10px 22px rgba(47, 143, 138, 0.22);
 }
 
 .cards-summary {
@@ -54,7 +54,7 @@
   display: grid;
   gap: 6px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(240, 248, 255, 0.98)),
+    var(--surface-gradient),
     var(--panel);
 }
 
@@ -81,7 +81,7 @@
 .card-gallery {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 18px;
+  gap: 16px;
 }
 
 .catalog-card {
@@ -89,26 +89,26 @@
   display: grid;
   grid-template-rows: 276px auto;
   position: relative;
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(242, 248, 255, 0.98)),
+    var(--surface-gradient),
     var(--panel);
   transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
   cursor: default;
 }
 
 .catalog-card:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 24px 44px rgba(73, 114, 163, 0.18);
-  border-color: rgba(79, 134, 217, 0.28);
+  transform: translateY(-4px);
+  box-shadow: 0 20px 38px rgba(32, 60, 68, 0.14);
+  border-color: rgba(47, 143, 138, 0.26);
 }
 
 .catalog-art {
   position: relative;
   background:
     radial-gradient(circle at top, rgba(255, 255, 255, 0.4), transparent 42%),
-    linear-gradient(180deg, rgba(31, 71, 112, 0.08), rgba(31, 71, 112, 0.02)),
-    linear-gradient(135deg, #b7d6ff, #eef7ff);
+    linear-gradient(180deg, rgba(47, 143, 138, 0.08), rgba(47, 143, 138, 0.02)),
+    linear-gradient(135deg, #c5ded8, #f2f8f4);
   overflow: hidden;
 }
 
@@ -197,7 +197,7 @@
 .catalog-type,
 .catalog-id,
 .catalog-stats span {
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.78);
   color: var(--muted);
@@ -207,7 +207,7 @@
 }
 
 .catalog-type {
-  background: rgba(79, 134, 217, 0.12);
+  background: rgba(47, 143, 138, 0.12);
   color: var(--accent-dark);
 }
 
@@ -246,7 +246,7 @@
   gap: 24px;
   position: relative;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(236, 245, 255, 0.99)),
+    var(--surface-gradient),
     var(--panel);
 }
 
@@ -259,11 +259,11 @@
 
 .card-preview-media {
   min-height: 560px;
-  border-radius: 24px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   background:
     radial-gradient(circle at top, rgba(255, 255, 255, 0.26), transparent 40%),
-    linear-gradient(135deg, #9fc6ff, #edf7ff);
+    linear-gradient(135deg, #b7d7ce, #f0f7f2);
   display: grid;
   place-items: center;
 }
@@ -304,9 +304,9 @@
 
 .card-preview-info h2 {
   margin: 0;
-  font-size: clamp(40px, 5vw, 70px);
-  line-height: 0.92;
-  letter-spacing: -0.04em;
+  font-size: clamp(34px, 5vw, 56px);
+  line-height: 1.02;
+  letter-spacing: 0;
 }
 
 .card-preview-body {
@@ -322,7 +322,7 @@
   line-height: 1.92;
   font-size: 17px;
   padding: 20px 22px;
-  border-radius: 22px;
+  border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.78);
   border: 1px solid rgba(56, 102, 154, 0.1);
 }
@@ -339,7 +339,7 @@
 
 .preview-meta-block {
   padding: 18px;
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.74);
   border: 1px solid rgba(56, 102, 154, 0.1);
   display: grid;
