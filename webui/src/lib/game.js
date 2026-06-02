@@ -85,12 +85,22 @@ export function describeEffect(effect) {
     case "TURN_HEAL":
       return `状态: 回合开始回复 +${effect.value}${stackSuffix}${suffix}`;
     case "PREVENT_NEXT_ACTION":
-      return `状态: 抵御下一次动作${stackSuffix}${suffix}`;
+      return `状态: ${describePreventableAction(effect.value)}${stackSuffix}${suffix}`;
     case "REVIVE_ON_DEATH":
       return `状态: 死亡后回复 1/${effect.value}${stackSuffix}${suffix}`;
     default:
       return `状态: ${effect.type}${suffix}`;
   }
+}
+
+function describePreventableAction(value) {
+  if (Number(value) === 0) {
+    return "抵御下一次角色攻击";
+  }
+  if (Number(value) === 1) {
+    return "抵御下一张技能牌";
+  }
+  return "抵御下一次动作";
 }
 
 export function describeAttack(card, currentFormIndex = 0) {

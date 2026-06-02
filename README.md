@@ -69,13 +69,13 @@ server:
   backendPort: 8080
 
 frontend:
-  baseUrl: "http://124.220.147.235:5173/CampusKing/#/"
+  baseUrl: ""
   apiBaseUrl: ""
   wsBaseUrl: ""
   githubUrl: "https://github.com/Tabris-ZX/CampusKing"
 
 asset:
-  baseUrl: "https://campus-king-1367968873.cos.ap-shanghai.myqcloud.com/campus-king"
+  baseUrl: ""
   localRoot: "resources"
   maxResponseBytes: 1048576
 

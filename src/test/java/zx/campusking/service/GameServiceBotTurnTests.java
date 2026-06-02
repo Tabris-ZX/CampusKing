@@ -15,6 +15,7 @@ import zx.campusking.model.dto.AttackCharacterRequest;
 import zx.campusking.model.dto.CreateRoomRequest;
 import zx.campusking.model.dto.EndTurnRequest;
 import zx.campusking.model.dto.PlayEffectRequest;
+import zx.campusking.model.dto.SacrificeRequest;
 import zx.campusking.model.dto.SummonRequest;
 import zx.campusking.websocket.GameWebSocketHandler;
 
@@ -264,7 +265,7 @@ class GameServiceBotTurnTests {
     }
 
     @Test
-    void foresightCostsNoActionPointAndDamagesPlayer() throws IOException {
+    void foresightCostsNoActionPointAndMakesPlayerLoseHealth() throws IOException {
         GameService service = createGameService();
         CreateRoomRequest request = new CreateRoomRequest();
         request.setBotMode(true);
@@ -292,6 +293,7 @@ class GameServiceBotTurnTests {
 
         assertEquals(1, human.getActionPoints());
         assertEquals(95, human.getHp());
+        assertTrue(match.getLogs().stream().anyMatch(log -> log.contains("失去了 5 点体力")));
     }
 
     @Test
@@ -416,6 +418,261 @@ class GameServiceBotTurnTests {
     }
 
     @Test
+    void elfRevivesNextFriendlyCharacterDefeatedByAttack() throws IOException {
+        GameService service = createGameService();
+        CreateRoomRequest request = new CreateRoomRequest();
+        request.setBotMode(true);
+        request.setHostName("测试玩家");
+
+        MatchState match = service.createRoom(request);
+        PlayerState human = requirePlayer(match, "P1");
+        PlayerState bot = requirePlayer(match, "P2");
+
+        human.getHand().clear();
+        CardInstance elf = new CardInstance("elf", human.getPlayerId(), 0);
+        human.getHand().add(elf);
+        human.getBoard().clear();
+        CardInstance meal = new CardInstance("meal", human.getPlayerId(), 20);
+        human.getBoard().add(meal);
+        bot.getBoard().clear();
+        CardInstance attacker = new CardInstance("sniper", bot.getPlayerId(), 30);
+        attacker.setSleeping(false);
+        bot.getBoard().add(attacker);
+        human.setActionPoints(3);
+        match.setCurrentPlayerId(human.getPlayerId());
+        match.setPhase(GamePhase.ACTION);
+        match.setReady(true);
+        match.setTurn(2);
+
+        PlayEffectRequest playEffectRequest = new PlayEffectRequest();
+        playEffectRequest.setPlayerId(human.getPlayerId());
+        playEffectRequest.setHandInstanceId(elf.getInstanceId());
+        service.playSkill(match.getMatchId(), playEffectRequest);
+
+        assertTrue(human.getStatusEffects().stream()
+                .anyMatch(effect -> effect.getType() == StatusEffectType.REVIVE_ON_DEATH && effect.getRemainingTurns() == 3));
+
+        match.setCurrentPlayerId(bot.getPlayerId());
+        AttackCharacterRequest attackRequest = new AttackCharacterRequest();
+        attackRequest.setPlayerId(bot.getPlayerId());
+        attackRequest.setAttackerInstanceId(attacker.getInstanceId());
+        attackRequest.setDefenderInstanceId(meal.getInstanceId());
+        service.attackCharacter(match.getMatchId(), attackRequest);
+
+        assertTrue(human.getBoard().stream().anyMatch(card -> card.getInstanceId().equals(meal.getInstanceId())));
+        assertEquals(20, meal.getCurrentHealth());
+        assertTrue(human.getStatusEffects().stream().noneMatch(effect -> effect.getType() == StatusEffectType.REVIVE_ON_DEATH));
+        assertTrue(match.getLogs().stream().anyMatch(log -> log.contains("死亡后回复到 20 点体力")));
+    }
+
+    @Test
+    void sacrificeDoesNotTriggerOrConsumeElfRevive() throws IOException {
+        GameService service = createGameService();
+        CreateRoomRequest request = new CreateRoomRequest();
+        request.setBotMode(true);
+        request.setHostName("测试玩家");
+
+        MatchState match = service.createRoom(request);
+        PlayerState human = requirePlayer(match, "P1");
+
+        human.getHand().clear();
+        CardInstance elf = new CardInstance("elf", human.getPlayerId(), 0);
+        human.getHand().add(elf);
+        human.getBoard().clear();
+        CardInstance meal = new CardInstance("meal", human.getPlayerId(), 100);
+        human.getBoard().add(meal);
+        human.setActionPoints(3);
+        match.setCurrentPlayerId(human.getPlayerId());
+        match.setPhase(GamePhase.ACTION);
+        match.setReady(true);
+
+        PlayEffectRequest elfRequest = new PlayEffectRequest();
+        elfRequest.setPlayerId(human.getPlayerId());
+        elfRequest.setHandInstanceId(elf.getInstanceId());
+        service.playSkill(match.getMatchId(), elfRequest);
+
+        SacrificeRequest sacrificeRequest = new SacrificeRequest();
+        sacrificeRequest.setPlayerId(human.getPlayerId());
+        sacrificeRequest.setTargetInstanceId(meal.getInstanceId());
+        service.sacrifice(match.getMatchId(), sacrificeRequest);
+
+        assertTrue(human.getBoard().stream().noneMatch(card -> card.getInstanceId().equals(meal.getInstanceId())));
+        assertTrue(match.getDiscardPile().stream().anyMatch(card -> card.getInstanceId().equals(meal.getInstanceId())));
+        assertTrue(human.getStatusEffects().stream()
+                .anyMatch(effect -> effect.getType() == StatusEffectType.REVIVE_ON_DEATH && effect.getStacks() == 1));
+        assertTrue(match.getLogs().stream().anyMatch(log -> log.contains("失去全部体力并进入墓地")));
+    }
+
+    @Test
+    void lightPreventsNextCharacterAttack() throws IOException {
+        GameService service = createGameService();
+        CreateRoomRequest request = new CreateRoomRequest();
+        request.setBotMode(true);
+        request.setHostName("测试玩家");
+
+        MatchState match = service.createRoom(request);
+        PlayerState human = requirePlayer(match, "P1");
+        PlayerState bot = requirePlayer(match, "P2");
+
+        human.getHand().clear();
+        CardInstance light = new CardInstance("light", human.getPlayerId(), 0);
+        human.getHand().add(light);
+        human.getBoard().clear();
+        CardInstance meal = new CardInstance("meal", human.getPlayerId(), 100);
+        human.getBoard().add(meal);
+        bot.getBoard().clear();
+        CardInstance attacker = new CardInstance("sniper", bot.getPlayerId(), 30);
+        attacker.setSleeping(false);
+        bot.getBoard().add(attacker);
+        human.setActionPoints(3);
+        match.setCurrentPlayerId(human.getPlayerId());
+        match.setPhase(GamePhase.ACTION);
+        match.setReady(true);
+        match.setTurn(2);
+
+        PlayEffectRequest playEffectRequest = new PlayEffectRequest();
+        playEffectRequest.setPlayerId(human.getPlayerId());
+        playEffectRequest.setHandInstanceId(light.getInstanceId());
+        service.playSkill(match.getMatchId(), playEffectRequest);
+
+        match.setCurrentPlayerId(bot.getPlayerId());
+        AttackCharacterRequest attackRequest = new AttackCharacterRequest();
+        attackRequest.setPlayerId(bot.getPlayerId());
+        attackRequest.setAttackerInstanceId(attacker.getInstanceId());
+        attackRequest.setDefenderInstanceId(meal.getInstanceId());
+        service.attackCharacter(match.getMatchId(), attackRequest);
+
+        assertEquals(100, meal.getCurrentHealth());
+        assertTrue(human.getStatusEffects().stream().noneMatch(effect -> effect.getType() == StatusEffectType.PREVENT_NEXT_ACTION));
+        assertTrue(match.getLogs().stream().anyMatch(log -> log.contains("抵御了") && log.contains("的攻击")));
+    }
+
+    @Test
+    void umbrellaPreventsNextEnemySkillCard() throws IOException {
+        GameService service = createGameService();
+        CreateRoomRequest request = new CreateRoomRequest();
+        request.setBotMode(true);
+        request.setHostName("测试玩家");
+
+        MatchState match = service.createRoom(request);
+        PlayerState human = requirePlayer(match, "P1");
+        PlayerState bot = requirePlayer(match, "P2");
+
+        human.getHand().clear();
+        CardInstance umbrella = new CardInstance("umbrella", human.getPlayerId(), 0);
+        human.getHand().add(umbrella);
+        human.getBoard().clear();
+        CardInstance meal = new CardInstance("meal", human.getPlayerId(), 100);
+        human.getBoard().add(meal);
+        bot.getHand().clear();
+        CardInstance bunch = new CardInstance("bunch", bot.getPlayerId(), 0);
+        bot.getHand().add(bunch);
+        human.setActionPoints(3);
+        bot.setActionPoints(3);
+        match.setCurrentPlayerId(human.getPlayerId());
+        match.setPhase(GamePhase.ACTION);
+        match.setReady(true);
+
+        PlayEffectRequest umbrellaRequest = new PlayEffectRequest();
+        umbrellaRequest.setPlayerId(human.getPlayerId());
+        umbrellaRequest.setHandInstanceId(umbrella.getInstanceId());
+        service.playSkill(match.getMatchId(), umbrellaRequest);
+
+        match.setCurrentPlayerId(bot.getPlayerId());
+        PlayEffectRequest bunchRequest = new PlayEffectRequest();
+        bunchRequest.setPlayerId(bot.getPlayerId());
+        bunchRequest.setHandInstanceId(bunch.getInstanceId());
+        service.playSkill(match.getMatchId(), bunchRequest);
+
+        assertEquals(100, meal.getCurrentHealth());
+        assertTrue(human.getStatusEffects().stream().noneMatch(effect -> effect.getType() == StatusEffectType.PREVENT_NEXT_ACTION));
+        assertTrue(match.getDiscardPile().stream().anyMatch(card -> card.getInstanceId().equals(bunch.getInstanceId())));
+        assertTrue(match.getLogs().stream().anyMatch(log -> log.contains("抵御了 普通一拳")));
+    }
+
+    @Test
+    void elfRevivesFriendlyCharacterDefeatedBySkillDamage() throws IOException {
+        GameService service = createGameService();
+        CreateRoomRequest request = new CreateRoomRequest();
+        request.setBotMode(true);
+        request.setHostName("测试玩家");
+
+        MatchState match = service.createRoom(request);
+        PlayerState human = requirePlayer(match, "P1");
+        PlayerState bot = requirePlayer(match, "P2");
+
+        human.getHand().clear();
+        CardInstance elf = new CardInstance("elf", human.getPlayerId(), 0);
+        human.getHand().add(elf);
+        human.getBoard().clear();
+        CardInstance meal = new CardInstance("meal", human.getPlayerId(), 10);
+        human.getBoard().add(meal);
+        bot.getHand().clear();
+        CardInstance bunch = new CardInstance("bunch", bot.getPlayerId(), 0);
+        bot.getHand().add(bunch);
+        human.setActionPoints(3);
+        bot.setActionPoints(3);
+        match.setCurrentPlayerId(human.getPlayerId());
+        match.setPhase(GamePhase.ACTION);
+        match.setReady(true);
+
+        PlayEffectRequest elfRequest = new PlayEffectRequest();
+        elfRequest.setPlayerId(human.getPlayerId());
+        elfRequest.setHandInstanceId(elf.getInstanceId());
+        service.playSkill(match.getMatchId(), elfRequest);
+
+        match.setCurrentPlayerId(bot.getPlayerId());
+        PlayEffectRequest bunchRequest = new PlayEffectRequest();
+        bunchRequest.setPlayerId(bot.getPlayerId());
+        bunchRequest.setHandInstanceId(bunch.getInstanceId());
+        service.playSkill(match.getMatchId(), bunchRequest);
+
+        assertTrue(human.getBoard().stream().anyMatch(card -> card.getInstanceId().equals(meal.getInstanceId())));
+        assertEquals(20, meal.getCurrentHealth());
+        assertTrue(match.getLogs().stream().anyMatch(log -> log.contains("死亡后回复到 20 点体力")));
+    }
+
+    @Test
+    void sanctuaryBuffsBoardCardsAndHealsAtTurnStart() throws IOException {
+        GameService service = createGameService();
+        CreateRoomRequest request = new CreateRoomRequest();
+        request.setBotMode(true);
+        request.setHostName("测试玩家");
+
+        MatchState match = service.createRoom(request);
+        PlayerState human = requirePlayer(match, "P1");
+        PlayerState bot = requirePlayer(match, "P2");
+
+        human.getHand().clear();
+        CardInstance sanctuary = new CardInstance("sanctuary", human.getPlayerId(), 0);
+        human.getHand().add(sanctuary);
+        human.getBoard().clear();
+        CardInstance meal = new CardInstance("meal", human.getPlayerId(), 80);
+        human.getBoard().add(meal);
+        human.setActionPoints(3);
+        match.setCurrentPlayerId(human.getPlayerId());
+        match.setPhase(GamePhase.ACTION);
+        match.setReady(true);
+
+        PlayEffectRequest playEffectRequest = new PlayEffectRequest();
+        playEffectRequest.setPlayerId(human.getPlayerId());
+        playEffectRequest.setHandInstanceId(sanctuary.getInstanceId());
+        service.playSkill(match.getMatchId(), playEffectRequest);
+
+        assertTrue(meal.getStatusEffects().stream().anyMatch(effect -> effect.getType() == StatusEffectType.ATTACK_UP && effect.getValue() == 10));
+        assertTrue(meal.getStatusEffects().stream().anyMatch(effect -> effect.getType() == StatusEffectType.MAX_HP_UP && effect.getValue() == 10));
+        assertTrue(meal.getStatusEffects().stream().anyMatch(effect -> effect.getType() == StatusEffectType.TURN_HEAL && effect.getValue() == 10));
+        assertEquals(80, meal.getCurrentHealth());
+
+        match.setCurrentPlayerId(bot.getPlayerId());
+        EndTurnRequest endTurnRequest = new EndTurnRequest();
+        endTurnRequest.setPlayerId(bot.getPlayerId());
+        service.endTurn(match.getMatchId(), endTurnRequest);
+
+        assertEquals(90, meal.getCurrentHealth());
+    }
+
+    @Test
     void rupanDiscardsRandomEnemyHandAfterAttackDamage() throws IOException {
         GameService service = createGameService();
         CreateRoomRequest request = new CreateRoomRequest();
@@ -490,6 +747,13 @@ class GameServiceBotTurnTests {
                 matchInitializerService,
                 0L
         );
+    }
+
+    private PlayerState requirePlayer(MatchState match, String playerId) {
+        return match.getPlayers().stream()
+                .filter(player -> playerId.equals(player.getPlayerId()))
+                .findFirst()
+                .orElseThrow();
     }
 
     private long countCards(List<CardInstance> deck, CardCatalogService cardCatalogService, CardType type, CardRarity rarity) {

@@ -297,7 +297,8 @@ public class GameService {
     }
 
     /**
-     * 献祭己方召唤区一名角色：该角色进入墓地，然后当前玩家抽 1 张牌。
+     * 献祭己方召唤区一名角色：该角色失去全部体力后进入墓地，然后当前玩家抽 1 张牌。
+     * 失去体力不是受到伤害，不触发抵御、复活或击败奖励。
      */
     public MatchState sacrifice(String matchId, SacrificeRequest request) {
         MatchState match = getMatch(matchId);
@@ -308,10 +309,11 @@ public class GameService {
         CardInstance target = matchSupportService.requireBoardCard(player, request.getTargetInstanceId());
         ensureActionPoints(player, 1);
         consumeActionPoints(player, 1);
+        target.setCurrentHealth(0);
         player.getBoard().remove(target);
         match.getDiscardPile().add(target);
         deckService.drawOne(match, player);
-        match.getLogs().add(player.getName() + " 消耗 1 点行动点, 献祭了 " + battleService.cardName(target) + ", 抽取了 1 张牌.");
+        match.getLogs().add(player.getName() + " 消耗 1 点行动点, 献祭了 " + battleService.cardName(target) + ". 该角色失去全部体力并进入墓地, 然后抽取了 1 张牌.");
 
         broadcastMatch(match);
         return match;

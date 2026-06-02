@@ -246,13 +246,14 @@
             <div class="battle-bottom-row">
               <div class="hand-zone" :class="{ 'fx-draw-receive': drawPulse }">
                 <div class="zone-title">手牌区</div>
-                <div class="hand-row">
+                <div ref="handRowRef" class="hand-row" :style="handRowStyle">
                   <div v-if="!selfPlayer?.hand?.length" class="board-empty">暂无手牌</div>
                   <article
-                    v-for="card in selfPlayer?.hand || []"
+                    v-for="(card, index) in selfPlayer?.hand || []"
                     :key="card.instanceId"
                     class="card selectable"
                     :class="handCardClass(card)"
+                    :style="handCardStyle(index)"
                     @click="handleHandCardClick(card)"
                     @dblclick="openDetail(card)"
                   >
@@ -416,16 +417,22 @@ const socket = ref(null);
 const detailCard = ref(null);
 const showDeckComposition = ref(false);
 const logsRef = ref(null);
+const handRowRef = ref(null);
+const handRowWidth = ref(0);
 const highlightedLogKey = ref("");
 const summonedCardIds = ref([]);
 const attackingCardIds = ref([]);
 const damagedCardIds = ref([]);
+const preventedSkillCardIds = ref([]);
+const preventedAttackCardIds = ref([]);
+const revivedCardIds = ref([]);
 const damagedPlayerIds = ref([]);
 const drawnHandIds = ref([]);
 const drawPulse = ref(false);
 const leavingBattle = ref(false);
 const resultHandled = ref(false);
 const effectTimers = new Set();
+let handRowResizeObserver = null;
 
 const PHASE_TEXT = {
   DRAW: "抽牌阶段",
@@ -563,6 +570,33 @@ const selfSlots = computed(() => {
 const opponentEffects = computed(() => toEffectBadges(opponentPlayer.value));
 const selfEffects = computed(() => toEffectBadges(selfPlayer.value));
 const battleLogs = computed(() => match.value?.logs || []);
+const handCards = computed(() => selfPlayer.value?.hand || []);
+const handRowStyle = computed(() => {
+  const cardCount = handCards.value.length;
+  if (cardCount <= 1 || handRowWidth.value <= 0) {
+    return {
+      "--hand-row-justify": "flex-start",
+      "--hand-card-overlap": "0px",
+      "--hand-hover-spread": "0px"
+    };
+  }
+
+  const cardWidth = handRowWidth.value <= 720 ? 160 : 154;
+  const sidePadding = 36;
+  const minimumGap = 4;
+  const maxOverlap = Math.round(cardWidth * 0.58);
+  const availableWidth = Math.max(cardWidth, handRowWidth.value - sidePadding);
+  const requiredGap = (availableWidth - cardWidth * cardCount) / Math.max(1, cardCount - 1);
+  const fitsWithoutOverlap = requiredGap >= minimumGap;
+  const overlap = fitsWithoutOverlap ? 0 : Math.min(maxOverlap, Math.max(0, Math.ceil(-requiredGap)));
+  const hoverSpread = fitsWithoutOverlap ? 0 : Math.min(overlap, Math.max(20, Math.round(cardWidth * 0.16)));
+
+  return {
+    "--hand-row-justify": fitsWithoutOverlap ? "space-between" : "flex-start",
+    "--hand-card-overlap": `${overlap}px`,
+    "--hand-hover-spread": `${hoverSpread}px`
+  };
+});
 const topDrawPileName = computed(() => {
   const topCard = match.value?.drawPile?.[0];
   return topCard ? cardDef(topCard.cardId).name : "空";
@@ -597,6 +631,11 @@ const deckComposition = computed(() => {
       const rightType = right.definition.type === "CHARACTER" ? 0 : 1;
       if (leftType !== rightType) {
         return leftType - rightType;
+      }
+      const leftRarity = left.definition.rarity === "RARE" ? 0 : 1;
+      const rightRarity = right.definition.rarity === "RARE" ? 0 : 1;
+      if (leftRarity !== rightRarity) {
+        return leftRarity - rightRarity;
       }
       return String(left.definition.name || left.cardId).localeCompare(String(right.definition.name || right.cardId), "zh-Hans-CN");
     });
@@ -880,6 +919,10 @@ function scrollLogsToBottom() {
   });
 }
 
+function updateHandRowWidth() {
+  handRowWidth.value = handRowRef.value?.clientWidth || 0;
+}
+
 function isLogsNearBottom() {
   if (!logsRef.value) {
     return true;
@@ -890,6 +933,90 @@ function isLogsNearBottom() {
 
 function mapInstances(list = []) {
   return new Map(list.map(card => [card.instanceId, card]));
+}
+
+function playerDisplayName(player) {
+  return player?.playerToken === "BOT" ? "瓦库" : (player?.name || "");
+}
+
+function findPlayerByLogName(matchState, name) {
+  const normalizedName = String(name || "").trim();
+  if (!normalizedName) {
+    return null;
+  }
+  return (matchState.players || []).find(player => playerDisplayName(player) === normalizedName || player.name === normalizedName) || null;
+}
+
+function protectedPlayerNameFromLog(log) {
+  const markerIndex = String(log || "").indexOf(" 抵御了 ");
+  if (markerIndex < 0) {
+    return "";
+  }
+  const beforeMarker = String(log).slice(0, markerIndex).trim();
+  return beforeMarker.split(/[，,]/).pop().trim();
+}
+
+function attackedCardNameFromLogs(logs) {
+  const attackLog = [...logs].reverse().find(log => String(log || "").includes("攻击了") && !String(log || "").includes("直接攻击了玩家"));
+  if (!attackLog) {
+    return "";
+  }
+  const matchResult = String(attackLog).match(/攻击了\s*([^,.。]+)/);
+  return matchResult?.[1]?.trim() || "";
+}
+
+function boardIdsForPlayer(player, cardName = "") {
+  if (!player) {
+    return [];
+  }
+  const normalizedCardName = String(cardName || "").trim();
+  const cards = normalizedCardName
+    ? (player.board || []).filter(card => cardDef(card.cardId).name === normalizedCardName)
+    : (player.board || []);
+  const targetCards = cards.length ? cards : (player.board || []);
+  return targetCards.map(card => card.instanceId);
+}
+
+function boardIdsForCardName(matchState, cardName) {
+  const normalizedCardName = String(cardName || "").trim();
+  if (!normalizedCardName) {
+    return [];
+  }
+  return (matchState.players || [])
+    .flatMap(player => player.board || [])
+    .filter(card => cardDef(card.cardId).name === normalizedCardName)
+    .map(card => card.instanceId);
+}
+
+function revivedCardNameFromLog(log) {
+  const marker = " 死亡后回复到 ";
+  const markerIndex = String(log || "").indexOf(marker);
+  if (markerIndex < 0) {
+    return "";
+  }
+  return String(log).slice(0, markerIndex).trim();
+}
+
+function processLogTriggeredAnimations(nextMatch, newLogs) {
+  if (!newLogs.length) {
+    return;
+  }
+
+  newLogs.forEach(log => {
+    const text = String(log || "");
+    if (text.includes("抵御了")) {
+      const protectedPlayer = findPlayerByLogName(nextMatch, protectedPlayerNameFromLog(text));
+      if (text.includes(" 的攻击")) {
+        flashIds(preventedAttackCardIds, boardIdsForPlayer(protectedPlayer, attackedCardNameFromLogs(newLogs)), 1150);
+      } else {
+        flashIds(preventedSkillCardIds, boardIdsForPlayer(protectedPlayer), 1150);
+      }
+    }
+
+    if (text.includes("死亡后回复到")) {
+      flashIds(revivedCardIds, boardIdsForCardName(nextMatch, revivedCardNameFromLog(text)), 1300);
+    }
+  });
 }
 
 function processMatchAnimations(nextMatch, previousMatch) {
@@ -953,6 +1080,8 @@ function processMatchAnimations(nextMatch, previousMatch) {
   if ((nextMatch.logs?.length || 0) > (previousMatch.logs?.length || 0)) {
     const lastIndex = nextMatch.logs.length - 1;
     const latestKey = logKey(nextMatch.logs[lastIndex], lastIndex);
+    const newLogs = nextMatch.logs.slice(previousMatch.logs?.length || 0);
+    processLogTriggeredAnimations(nextMatch, newLogs);
     highlightedLogKey.value = latestKey;
     queueEffectReset(() => {
       if (highlightedLogKey.value === latestKey) {
@@ -995,6 +1124,9 @@ function resetLocalBattleState() {
   summonedCardIds.value = [];
   attackingCardIds.value = [];
   damagedCardIds.value = [];
+  preventedSkillCardIds.value = [];
+  preventedAttackCardIds.value = [];
+  revivedCardIds.value = [];
   damagedPlayerIds.value = [];
   drawnHandIds.value = [];
   drawPulse.value = false;
@@ -1098,7 +1230,10 @@ function boardCardClass(instance, isSelfBoard) {
     "sacrifice-target": canSacrificeTarget,
     "fx-summoned": summonedCardIds.value.includes(instance.instanceId),
     "fx-attacking": attackingCardIds.value.includes(instance.instanceId),
-    "fx-hit": damagedCardIds.value.includes(instance.instanceId)
+    "fx-hit": damagedCardIds.value.includes(instance.instanceId),
+    "fx-prevent-skill": preventedSkillCardIds.value.includes(instance.instanceId),
+    "fx-prevent-attack": preventedAttackCardIds.value.includes(instance.instanceId),
+    "fx-revived": revivedCardIds.value.includes(instance.instanceId)
   };
 }
 
@@ -1110,6 +1245,12 @@ function handCardClass(instance) {
     selected: !discardMode.value && selectedHandId.value === instance.instanceId,
     "discard-selected": discardSelectionIds.value.includes(instance.instanceId),
     "fx-draw-arrival": drawnHandIds.value.includes(instance.instanceId)
+  };
+}
+
+function handCardStyle(index) {
+  return {
+    "--hand-card-z": String(index + 1)
   };
 }
 
@@ -1240,7 +1381,13 @@ function handleHandCardClick(card) {
     toggleDiscardSelection(card.instanceId);
     return;
   }
+  if (selectedHandId.value === card.instanceId) {
+    selectedHandId.value = "";
+    pendingSkillTarget.value = null;
+    return;
+  }
   selectedHandId.value = card.instanceId;
+  pendingSkillTarget.value = null;
 }
 
 function toggleDiscardSelection(instanceId) {
@@ -1536,8 +1683,21 @@ watch(match, (value, oldValue) => {
   }
 });
 
+watch(() => handCards.value.length, () => {
+  nextTick(updateHandRowWidth);
+});
+
 onMounted(async () => {
   document.addEventListener("keydown", onKeydown);
+  if (window.ResizeObserver) {
+    handRowResizeObserver = new ResizeObserver(updateHandRowWidth);
+    if (handRowRef.value) {
+      handRowResizeObserver.observe(handRowRef.value);
+    }
+  } else {
+    window.addEventListener("resize", updateHandRowWidth);
+  }
+  nextTick(updateHandRowWidth);
   try {
     const config = await api("/api/config");
     assetBaseUrl.value = (config.assetBaseUrl || assetRoot()).trim();
@@ -1551,6 +1711,12 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   document.removeEventListener("keydown", onKeydown);
+  if (handRowResizeObserver) {
+    handRowResizeObserver.disconnect();
+    handRowResizeObserver = null;
+  } else {
+    window.removeEventListener("resize", updateHandRowWidth);
+  }
   if (pollTimer.value) {
     clearInterval(pollTimer.value);
   }

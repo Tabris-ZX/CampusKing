@@ -70,11 +70,13 @@ public record CardEffectContext(
     }
 
     /**
-     * 对技能使用者造成伤害。
+     * 让技能使用者失去体力。
+     * 失去体力不是受到伤害，不触发抵御、伤害或致命伤害相关效果。
      */
-    public void damageSelf(int damage) {
-        player.setHp(Math.max(0, player.getHp() - Math.max(0, damage)));
-        match.getLogs().add(player.getName() + " 受到了 " + Math.max(0, damage) + " 点伤害.");
+    public void loseSelfHealth(int amount) {
+        int loss = Math.max(0, amount);
+        player.setHp(Math.max(0, player.getHp() - loss));
+        match.getLogs().add(player.getName() + " 失去了 " + loss + " 点体力.");
     }
 
     /**
@@ -127,9 +129,6 @@ public record CardEffectContext(
      * 对目标角色造成伤害，并处理死亡清理和击败奖励。
      */
     public void damageCharacter(PlayerState owner, CardInstance target, int amount) {
-        if (owner.getPlayerId().equals(enemy.getPlayerId()) && statusEffectService.consumeActionPrevention(enemy, match, PreventableAction.SKILL_CARD, definition.getName())) {
-            return;
-        }
         target.setCurrentHealth(target.getCurrentHealth() - Math.max(0, amount));
         battleService.cleanupDefeated(match, owner, player, deckService);
         match.getLogs().add(battleService.cardName(target) + " 受到了 " + Math.max(0, amount) + " 点伤害.");
@@ -163,9 +162,6 @@ public record CardEffectContext(
      * 对目标玩家场上全部角色造成伤害。
      */
     public void damageBoard(PlayerState owner, int amount) {
-        if (owner.getPlayerId().equals(enemy.getPlayerId()) && statusEffectService.consumeActionPrevention(enemy, match, PreventableAction.SKILL_CARD, definition.getName())) {
-            return;
-        }
         for (CardInstance target : owner.getBoard()) {
             target.setCurrentHealth(target.getCurrentHealth() - Math.max(0, amount));
         }

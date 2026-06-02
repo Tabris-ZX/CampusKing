@@ -86,7 +86,7 @@ public final class SampleCard extends BaseSkillCard {
 
 玩家生命：
 
-- `damageSelf(int damage)`：对技能使用者造成伤害。
+- `loseSelfHealth(int amount)`：让技能使用者失去体力。失去体力不是受到伤害，不触发抵御或伤害相关效果。
 
 角色生命：
 
@@ -102,7 +102,7 @@ public final class SampleCard extends BaseSkillCard {
 - `applyCardBuff(CardInstance target, StatusEffectType type, int value, int stacks, Integer remainingTurns)`：给单个角色添加 buff。
 - `applyBoardBuff(PlayerState targetPlayer, StatusEffectType type, int value, int stacks, Integer remainingTurns)`：给某玩家场上全部角色添加同一种 buff。
 - `applyPrevention(PreventableAction action)`：给使用者添加抵御指定动作的效果。
-- `applyReviveOnDeath()`：给使用者添加死亡复活效果。
+- `applyReviveOnDeath()`：给使用者添加受到致命伤害后回复的效果。
 
 手牌：
 
@@ -112,11 +112,11 @@ public final class SampleCard extends BaseSkillCard {
 
 ## 5. 组合示例
 
-预见时间：获得行动点并自伤。
+预见时间：获得行动点并失去体力。
 
 ```java
 context.gainActionPoints(context.value());
-context.damageSelf(5);
+context.loseSelfHealth(5);
 ```
 
 汽水：先摸牌，再按目标归属治疗或伤害。
