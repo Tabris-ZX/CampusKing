@@ -11,9 +11,7 @@
   overflow: hidden;
   position: relative;
   border-radius: var(--radius-lg);
-  background:
-    var(--surface-gradient),
-    var(--panel);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.58), rgba(250, 248, 239, 0.46));
 }
 
 .cards-hero h1 {
@@ -58,9 +56,7 @@
   padding: 16px 18px;
   display: grid;
   gap: 6px;
-  background:
-    var(--surface-gradient),
-    var(--panel);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.58), rgba(250, 248, 239, 0.46));
 }
 
 .summary-label {
@@ -96,9 +92,7 @@
   aspect-ratio: 5 / 7;
   border-width: 3px;
   border-radius: var(--radius-lg);
-  background:
-    var(--surface-gradient),
-    var(--panel);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.52), rgba(238, 246, 255, 0.34));
   transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
   cursor: default;
 }
@@ -331,9 +325,7 @@
   grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
   gap: 24px;
   position: relative;
-  background:
-    var(--surface-gradient),
-    var(--panel);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.68), rgba(242, 248, 255, 0.54));
 }
 
 .card-preview-close {
@@ -411,7 +403,7 @@
   font-size: 15px;
   padding: 16px 18px;
   border-radius: var(--radius-lg);
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.54);
   border: 1px solid rgba(56, 102, 154, 0.1);
 }
 
@@ -428,7 +420,7 @@
 .preview-meta-block {
   padding: 18px;
   border-radius: var(--radius-lg);
-  background: rgba(255, 255, 255, 0.74);
+  background: rgba(255, 255, 255, 0.52);
   border: 1px solid rgba(56, 102, 154, 0.1);
   display: grid;
   gap: 8px;

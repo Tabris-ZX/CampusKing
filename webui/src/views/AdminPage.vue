@@ -6,7 +6,7 @@
       <div>
         <p class="eyebrow">Control Room</p>
         <h1>管理后台</h1>
-        <p class="hero-copy">公告读取 resources/notices，卡牌参数保存到 cardRegistry.json。</p>
+        <p class="hero-copy">公告读取 data/notice，卡牌参数保存到 cardRegistry.json。</p>
       </div>
       <div class="admin-hero-actions">
         <button

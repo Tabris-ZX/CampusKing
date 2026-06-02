@@ -100,7 +100,7 @@ public class GameController {
     }
 
     /**
-     * 保存一条公告到 resources/notices。
+     * 保存一条公告到 data/notice。
      */
     @PostMapping("/notices")
     public NoticeResponse saveNotice(@RequestBody SaveNoticeRequest request) {

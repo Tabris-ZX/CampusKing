@@ -62,6 +62,21 @@ public class AssetController {
     }
 
     /**
+     * 读取 UI 占位图等本地通用图片。
+     *
+     * @param fileName resources/images/ui 下的文件名
+     * @return 图片二进制响应
+     */
+    @GetMapping("/ui/{fileName}")
+    public ResponseEntity<byte[]> uiImage(@PathVariable String fileName) {
+        AssetImageService.ImagePayload payload = assetImageService.loadUiImage(fileName);
+        return ResponseEntity.ok()
+          .cacheControl(CacheControl.maxAge(Duration.ofHours(12)).cachePublic())
+          .contentType(payload.mediaType())
+          .body(payload.bytes());
+    }
+
+    /**
      * 读取 resources 根目录下的 favicon。
      *
      * @return favicon 二进制响应

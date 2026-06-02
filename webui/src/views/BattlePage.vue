@@ -9,16 +9,14 @@
           <section v-else class="battle-board">
             <div class="battle-top-strip">
               <div class="battle-headline">
-                <button
-                  class="alt danger-button battle-exit-action"
-                  :disabled="leavingBattle"
-                  @click="handleLeaveBattle"
-                >
-                  退出对局
-                </button>
-                <span class="battle-headline-label">对局状态</span>
-                <strong>{{ battleHeadline }}</strong>
-                <span class="battle-headline-subtext">{{ battleSubtext }}</span>
+                <div class="battle-status-item">
+                  <span>回合数</span>
+                  <strong>{{ turnInfo }}</strong>
+                </div>
+                <div class="battle-status-item">
+                  <span>房间号</span>
+                  <strong>{{ roomCode || "------" }}</strong>
+                </div>
                 <div class="battle-headline-actions">
                   <button
                     class="alt battle-inline-action"
@@ -30,48 +28,62 @@
                   </button>
                 </div>
               </div>
-              <div class="effect-summary">
-                <div class="compact-effects">
-                  <span>对方状态</span>
-                  <div class="effect-list">
-                    <span
-                      v-for="effect in opponentEffects"
-                      :key="effect.key"
-                      class="effect-badge"
-                      :class="effect.category"
-                    >
-                      {{ effect.label }}
+              <section class="battle-log-panel top-log-panel">
+                <div class="zone-title">日志</div>
+                <div ref="logsRef" class="logs">
+                  <div v-if="!battleLogs.length" class="log-entry empty">暂无日志</div>
+                  <div
+                    v-for="(log, index) in battleLogs"
+                    :key="logKey(log, index)"
+                    class="log-entry"
+                    :class="{ latest: highlightedLogKey === logKey(log, index) }"
+                  >
+                    <span class="log-index">{{ String(index + 1).padStart(2, "0") }}</span>
+                    <span class="log-text">
+                      <span
+                        v-for="(part, partIndex) in logParts(log)"
+                        :key="`${logKey(log, index)}-${partIndex}`"
+                        :class="part.className"
+                      >{{ part.text }}</span>
                     </span>
-                    <span v-if="!opponentEffects.length" class="effect-badge">无状态</span>
                   </div>
                 </div>
-                <div class="compact-effects">
-                  <span>我方状态</span>
-                  <div class="effect-list">
-                    <span
-                      v-for="effect in selfEffects"
-                      :key="effect.key"
-                      class="effect-badge"
-                      :class="effect.category"
-                    >
-                      {{ effect.label }}
-                    </span>
-                    <span v-if="!selfEffects.length" class="effect-badge">无状态</span>
-                  </div>
-                </div>
+              </section>
+              <div class="top-log-actions">
+                <button class="alt battle-inline-action" type="button" @click="showDeckComposition = true">
+                  卡牌构成
+                </button>
+                <button
+                  class="alt danger-button battle-exit-action"
+                  :disabled="leavingBattle"
+                  @click="handleLeaveBattle"
+                >
+                  退出对局
+                </button>
               </div>
             </div>
 
             <div class="battle-main-grid">
               <div class="battle-lanes">
                 <div class="battle-player-row">
-                <div
-                  class="player-avatar"
-                  :class="playerAvatarClass(opponentPlayer)"
-                  @click="handlePlayerTarget(opponentPlayer)"
-                >
-                    <div>{{ opponentPlayerLabel }}</div>
-                    <span>{{ opponentPlayer ? `${opponentPlayer.hp} / 100` : "" }}</span>
+                  <div class="player-panel">
+                    <div
+                      class="player-avatar"
+                      :class="playerAvatarClass(opponentPlayer)"
+                      @click="handlePlayerTarget(opponentPlayer)"
+                    >
+                      <img
+                        v-if="playerAvatarImage(opponentPlayer)"
+                        class="player-avatar-image"
+                        :src="playerAvatarImage(opponentPlayer)"
+                        :alt="opponentPlayerLabel"
+                        @error="handleAvatarImageError"
+                      >
+                    </div>
+                    <div class="player-avatar-info">
+                      <div>{{ opponentPlayerLabel }}</div>
+                      <span>{{ opponentPlayer ? `${opponentPlayer.hp} / 100` : "" }}</span>
+                    </div>
                   </div>
                   <div class="summon-zone">
                     <div
@@ -133,13 +145,24 @@
                 </div>
 
                 <div class="battle-player-row">
-                <div
-                  class="player-avatar"
-                  :class="playerAvatarClass(selfPlayer)"
-                  @click="handlePlayerTarget(selfPlayer)"
-                >
-                    <div>{{ selfPlayerLabel }}</div>
-                    <span>{{ selfPlayer ? `${selfPlayer.hp} / 100` : "" }}</span>
+                  <div class="player-panel">
+                    <div
+                      class="player-avatar"
+                      :class="playerAvatarClass(selfPlayer)"
+                      @click="handlePlayerTarget(selfPlayer)"
+                    >
+                      <img
+                        v-if="playerAvatarImage(selfPlayer)"
+                        class="player-avatar-image"
+                        :src="playerAvatarImage(selfPlayer)"
+                        :alt="selfPlayerLabel"
+                        @error="handleAvatarImageError"
+                      >
+                    </div>
+                    <div class="player-avatar-info">
+                      <div>{{ selfPlayerLabel }}</div>
+                      <span>{{ selfPlayer ? `${selfPlayer.hp} / 100` : "" }}</span>
+                    </div>
                   </div>
                   <div class="summon-zone">
                     <div
@@ -202,11 +225,36 @@
               </div>
 
               <aside class="battle-right-rail">
-                <div class="pile-box action-point-box">
-                  <span>行动点</span>
-                  <strong>{{ selfActionPoints }} / 3</strong>
-                  <button class="pile-inline-action" type="button" @click="showDeckComposition = true">卡牌构成</button>
-                </div>
+                <section class="effects-panel player-effects-panel">
+                  <div class="effects-title">对方状态</div>
+                  <div class="row-effects">
+                    <span
+                      v-for="effect in opponentEffects"
+                      :key="effect.key"
+                      class="effect-badge"
+                      :class="effect.category"
+                    >
+                      {{ effect.label }}
+                    </span>
+                    <span v-if="!opponentEffects.length" class="effect-badge">无状态</span>
+                  </div>
+                </section>
+
+                <section class="effects-panel player-effects-panel">
+                  <div class="effects-title">我方状态</div>
+                  <div class="row-effects">
+                    <span
+                      v-for="effect in selfEffects"
+                      :key="effect.key"
+                      class="effect-badge"
+                      :class="effect.category"
+                    >
+                      {{ effect.label }}
+                    </span>
+                    <span v-if="!selfEffects.length" class="effect-badge">无状态</span>
+                  </div>
+                </section>
+
                 <div class="pile-pair">
                   <div class="pile-box compact-pile-box">
                     <span>墓地</span>
@@ -219,27 +267,10 @@
                   </div>
                 </div>
 
-                <section class="battle-log-panel">
-                  <div class="zone-title">日志</div>
-                  <div ref="logsRef" class="logs">
-                    <div v-if="!battleLogs.length" class="log-entry empty">暂无日志</div>
-                    <div
-                      v-for="(log, index) in battleLogs"
-                      :key="logKey(log, index)"
-                      class="log-entry"
-                      :class="{ latest: highlightedLogKey === logKey(log, index) }"
-                    >
-                      <span class="log-index">{{ String(index + 1).padStart(2, "0") }}</span>
-                      <span class="log-text">
-                        <span
-                          v-for="(part, partIndex) in logParts(log)"
-                          :key="`${logKey(log, index)}-${partIndex}`"
-                          :class="part.className"
-                        >{{ part.text }}</span>
-                      </span>
-                    </div>
-                  </div>
-                </section>
+                <div class="pile-box action-point-box">
+                  <span>行动点</span>
+                  <strong>{{ selfActionPoints }} / 3</strong>
+                </div>
               </aside>
             </div>
 
@@ -394,7 +425,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRouter } from "vue-router";
 import AppTopbar from "../components/AppTopbar.vue";
 import { actionCostOf, api, buildInviteLink, cardImage, describeAttack, describeEffect, describeEffectCategory, describeEffectType, describeRarity, describeSkillRange, describeType, getInviteBlockedReason, isMissingRoomError, swapCardImageToFallback } from "../lib/game";
-import { assetRoot, copyText, publicBaseUrl, wsGamePath, wsRoot } from "../lib/runtime-config";
+import { apiRoot, assetRoot, copyText, publicBaseUrl, wsGamePath, wsRoot } from "../lib/runtime-config";
 import { clearSession, ensureSessionPlayerName, loadSession, saveSession } from "../lib/session";
 import { showToast } from "../lib/toast";
 
@@ -459,13 +490,6 @@ const turnInfo = computed(() => {
 
 const phaseText = computed(() => describePhase(match.value?.phase));
 
-const phaseInfo = computed(() => {
-  if (!match.value) {
-    return "尚未就绪";
-  }
-  return `阶段 ${phaseText.value} | 当前行动方 ${match.value.currentPlayerId} | ${isMyTurn.value ? "轮到你" : "等待对方"}`;
-});
-
 const emptyStateText = computed(() => {
   if (roomCode.value) {
     return `正在恢复房间 ${roomCode.value}，如果长时间没有响应，请回首页重新加入。`;
@@ -501,56 +525,6 @@ const canConfirmSelectedHand = computed(() => {
     return my.board.length < 3 && my.summonsThisTurn < 1;
   }
   return definition.type === "SKILL";
-});
-
-const modeTitle = computed(() => {
-  if (pendingSkillTarget.value) {
-    return "当前模式：选择技能目标";
-  }
-  if (discardMode.value) {
-    return "当前模式：选择弃牌";
-  }
-  if (sacrificeMode.value) {
-    return "当前模式：选择献祭角色";
-  }
-  if (selectedAttackerId.value) {
-    return "当前模式：攻击目标选择";
-  }
-  if (selectedHandId.value) {
-    return "当前模式：手牌已选择";
-  }
-  return "当前模式：空闲";
-});
-
-const modeText = computed(() => {
-  const my = selfPlayer.value;
-  if (!match.value || !my) {
-    return "没有正在进行的操作。";
-  }
-  if (pendingSkillTarget.value) {
-    const selectedCard = my.hand.find(card => card.instanceId === pendingSkillTarget.value.instanceId);
-    const definition = selectedCard ? cardDef(selectedCard.cardId) : null;
-    return definition
-      ? `请为 ${definition.name} 选择一个场上角色目标。`
-      : "请为当前技能选择一个场上角色目标。";
-  }
-  if (discardMode.value) {
-    return `请选择 ${discardOverflow.value} 张手牌弃置，已选择 ${discardSelectionIds.value.length} 张。`;
-  }
-  if (sacrificeMode.value) {
-    return `请选择己方召唤区一名角色献祭，将消耗 1 点行动点。当前剩余 ${selfActionPoints.value} 点。`;
-  }
-  if (selectedAttackerId.value) {
-    const attacker = my.board.find(card => card.instanceId === selectedAttackerId.value);
-    const definition = attacker ? cardDef(attacker.cardId) : null;
-    return definition ? `已选择攻击者 ${definition.name}。` : "已选择攻击者。";
-  }
-  if (selectedHandId.value) {
-    const selectedCard = my.hand.find(card => card.instanceId === selectedHandId.value);
-    const definition = selectedCard ? cardDef(selectedCard.cardId) : null;
-    return definition ? `已选择 ${definition.name}，消耗 ${cardActionCost(selectedCard.cardId)} 点行动点。点击“确定”使用。` : "已选择一张手牌。";
-  }
-  return isMyTurn.value ? `可选择手牌出牌，或选择场上可攻击角色。当前剩余 ${selfActionPoints.value} 点行动点。` : "当前不是你的回合，等待对方操作。";
 });
 
 const enemySlots = computed(() => {
@@ -666,24 +640,6 @@ const inviteBlockedReason = computed(() => {
   return getInviteBlockedReason(match.value);
 });
 const canCopyInviteLink = computed(() => !!roomCode.value && !inviteBlockedReason.value);
-const battleHeadline = computed(() => {
-  if (!match.value) {
-    return "等待对局开始";
-  }
-  if (match.value.phase === "FINISHED") {
-    return winnerText.value;
-  }
-  return `${phaseText.value} · ${turnInfo.value}`;
-});
-const battleSubtext = computed(() => {
-  if (!match.value) {
-    return "房间建立后，等待对局数据同步。";
-  }
-  if (match.value.phase === "FINISHED") {
-    return "对局已结束，即将退出房间。";
-  }
-  return `房间 ${roomCode.value || "------"} · ${phaseInfo.value} · ${modeTitle.value}。${modeText.value}`;
-});
 const winnerText = computed(() => {
   if (!match.value?.winnerId) {
     return "对局结束";
@@ -1215,6 +1171,20 @@ function playerAvatarClass(player) {
   };
 }
 
+function playerAvatarImage(player) {
+  if (!player) {
+    return "";
+  }
+  if (player.playerToken === "BOT") {
+    return uiAssetImage("bot.png");
+  }
+  return uiAssetImage(player.playerId === "P1" ? "avatar1.png" : "avatar2.jpg");
+}
+
+function uiAssetImage(fileName) {
+  return `${apiRoot().replace(/\/$/, "")}/api/assets/ui/${fileName}`;
+}
+
 function boardCardClass(instance, isSelfBoard) {
   const canAttack = isSelfBoard && isMyTurn.value && match.value?.phase === "ACTION" && !instance.sleeping;
   const canSacrificeTarget = isSelfBoard && sacrificeMode.value && isMyTurn.value && match.value?.phase === "ACTION";
@@ -1265,6 +1235,10 @@ function handleImageError(event, cardId) {
   if (!swapCardImageToFallback(event, cardId, cardsMap.value, assetBaseUrl.value)) {
     event.target.remove();
   }
+}
+
+function handleAvatarImageError(event) {
+  event.target.remove();
 }
 
 async function copyInviteLink() {

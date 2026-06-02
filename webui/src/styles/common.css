@@ -36,21 +36,9 @@ body {
   scrollbar-gutter: stable both-edges;
   color: var(--ink);
   background:
-    linear-gradient(135deg, rgba(79, 134, 217, 0.1), transparent 28%),
-    linear-gradient(225deg, rgba(143, 184, 246, 0.14), transparent 28%),
+    linear-gradient(180deg, rgba(244, 248, 255, 0.38), rgba(223, 238, 255, 0.34)),
+    url("/api/assets/ui/background.png") center center / cover fixed no-repeat,
     linear-gradient(180deg, var(--bg-top), var(--bg-bottom));
-}
-
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(255,255,255,0.24) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.2) 1px, transparent 1px);
-  background-size: 34px 34px;
-  pointer-events: none;
-  opacity: 0.26;
 }
 
 a {

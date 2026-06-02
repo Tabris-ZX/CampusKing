@@ -18,20 +18,18 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
- * 读取和保存 resources/notices 下的公告文件。
+ * 读取和保存 data/notice 下的公告文件。
  */
 @Service
 public class NoticeService {
 
-    private static final Path NOTICE_DIR = Path.of("resources", "notices");
+    private static final Path NOTICE_DIR = Path.of("data", "notice");
+    private static final Path LEGACY_NOTICE_DIR = Path.of("data", "notices");
     private static final Pattern NOTICE_NAME_PATTERN = Pattern.compile("^(\\d{2})(\\d{2})(\\d{2})-(\\d{2})(\\d{2})\\.md$");
     private static final DateTimeFormatter NOTICE_FILE_FORMAT = DateTimeFormatter.ofPattern("yyMMdd-HHmm");
 
     public List<NoticeResponse> listNotices() {
-        if (!Files.isDirectory(NOTICE_DIR)) {
-            return List.of();
-        }
-        try (Stream<Path> paths = Files.list(NOTICE_DIR)) {
+        try (Stream<Path> paths = Stream.concat(listNoticeDir(NOTICE_DIR), listNoticeDir(LEGACY_NOTICE_DIR))) {
             return paths
                     .filter(Files::isRegularFile)
                     .filter(path -> NOTICE_NAME_PATTERN.matcher(path.getFileName().toString()).matches())
@@ -41,6 +39,13 @@ public class NoticeService {
         } catch (IOException exception) {
             throw new UncheckedIOException("读取公告失败", exception);
         }
+    }
+
+    private Stream<Path> listNoticeDir(Path dir) throws IOException {
+        if (!Files.isDirectory(dir)) {
+            return Stream.empty();
+        }
+        return Files.list(dir);
     }
 
     public NoticeResponse saveNotice(SaveNoticeRequest request) {

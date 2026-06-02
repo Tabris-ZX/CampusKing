@@ -19,11 +19,7 @@
   position: relative;
   overflow: hidden;
   border-radius: var(--radius-lg);
-  background:
-    linear-gradient(135deg, rgba(79, 134, 217, 0.12), transparent 36%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(238, 246, 255, 0.9)),
-    var(--surface-gradient),
-    var(--panel);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.58), rgba(238, 246, 255, 0.42));
   box-shadow:
     0 22px 48px rgba(43, 82, 128, 0.13),
     inset 0 1px 0 rgba(255, 255, 255, 0.92);
@@ -82,8 +78,7 @@
   z-index: 1;
   border-radius: var(--radius-lg);
   border: 1px solid rgba(56, 102, 154, 0.16);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(243, 248, 255, 0.86));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.58), rgba(243, 248, 255, 0.44));
   padding: 22px;
   display: grid;
   gap: 12px;
@@ -161,10 +156,7 @@
   gap: 10px;
   min-height: 190px;
   align-content: start;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(244, 249, 255, 0.9)),
-    var(--surface-gradient),
-    var(--panel);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.56), rgba(244, 249, 255, 0.42));
   border-color: rgba(56, 102, 154, 0.14);
 }
 
@@ -198,10 +190,7 @@
   padding: 18px;
   grid-template-columns: 1fr;
   gap: 10px;
-  background:
-    linear-gradient(180deg, rgba(79, 134, 217, 0.09), rgba(255, 255, 255, 0.9)),
-    var(--surface-gradient),
-    var(--panel);
+  background: linear-gradient(180deg, rgba(79, 134, 217, 0.08), rgba(255, 255, 255, 0.48));
 }
 
 .home-session > div {
@@ -237,10 +226,7 @@
   width: min(760px, 100%);
   padding: 28px;
   position: relative;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(242, 248, 255, 0.94)),
-    var(--surface-gradient),
-    var(--panel);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.68), rgba(242, 248, 255, 0.56));
   box-shadow: 0 26px 80px rgba(16, 32, 54, 0.28);
 }
 

@@ -149,7 +149,7 @@ const notices = ref([]);
 const noticeLoading = ref(false);
 const noticeError = ref("");
 const selectedNoticeName = ref("");
-const emptyNoticeHtml = renderMarkdown("# 暂无公告\n\n请在 `resources/notices` 下添加 `yymmdd-hhmm.md` 公告文件。");
+const emptyNoticeHtml = renderMarkdown("# 暂无公告\n\n请在 `data/notice` 下添加 `yymmdd-hhmm.md` 公告文件。");
 const noticeErrorHtml = computed(() => renderMarkdown(`# 公告加载失败\n\n${noticeError.value || "请稍后重试。"}`));
 const docs = [
   {
