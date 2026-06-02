@@ -31,8 +31,11 @@ public final class SodaCard extends BaseSkillCard {
 
     @Override
     public void resolveSkill(CardEffectContext context) {
-        context.drawOne();
-        context.drawOne();
-        context.modifyUnit();
+        context.drawCards(context.player(), 2);
+        if (context.targetsSelfBoard()) {
+            context.healCharacter(context.player(), context.targetBoardCard(context.player()), context.value());
+            return;
+        }
+        context.damageCharacter(context.enemy(), context.targetBoardCard(context.enemy()), context.value());
     }
 }

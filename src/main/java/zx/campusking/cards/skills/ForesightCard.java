@@ -15,7 +15,7 @@ public final class ForesightCard extends BaseSkillCard {
 
     @Override
     public void resolveSkill(CardEffectContext context) {
-        context.gainActionPoint();
+        context.gainActionPoints(context.value());
         context.damageSelf(5);
     }
 }

@@ -70,6 +70,13 @@ public interface GameCard {
     }
 
     /**
+     * 角色攻击实际造成伤害后的 hook。
+     * 被抵御或伤害为 0 时不会触发。
+     */
+    default void afterAttackDamage(CardAttackDamageContext context) {
+    }
+
+    /**
      * 角色被击败时的特殊处理 hook。
      * 返回 true 表示卡牌已经自行处理死亡结果，BattleService 不再进入通用死亡流程。
      */

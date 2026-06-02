@@ -36,6 +36,8 @@ public class MatchState {
     private boolean ready;
     /** 对局模式，默认双人 PVP。 */
     private BotMode mode = BotMode.PVP;
+    /** 玩法类型，默认单面玩法。 */
+    private MatchPlayType playType = MatchPlayType.SINGLE_SIDE;
     /** 对局日志，前端用来展示最近发生的规则事件。 */
     private List<String> logs = new ArrayList<>();
 

@@ -17,5 +17,7 @@ public class CreateRoomRequest {
     private String playerToken;
     /** 是否直接创建人机模式房间。 */
     private Boolean botMode;
+    /** 玩法类型：SINGLE_SIDE 或 DOUBLE_SIDE。 */
+    private String playType;
 
 }

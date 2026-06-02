@@ -2,11 +2,16 @@ package zx.campusking.service;
 
 import org.junit.jupiter.api.Test;
 import zx.campusking.model.BotMode;
+import zx.campusking.model.CardDefinition;
 import zx.campusking.model.CardInstance;
+import zx.campusking.model.CardRarity;
+import zx.campusking.model.CardType;
 import zx.campusking.model.GamePhase;
+import zx.campusking.model.MatchPlayType;
 import zx.campusking.model.MatchState;
 import zx.campusking.model.PlayerState;
 import zx.campusking.model.StatusEffectType;
+import zx.campusking.model.dto.AttackCharacterRequest;
 import zx.campusking.model.dto.CreateRoomRequest;
 import zx.campusking.model.dto.EndTurnRequest;
 import zx.campusking.model.dto.PlayEffectRequest;
@@ -16,6 +21,9 @@ import zx.campusking.websocket.GameWebSocketHandler;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -24,6 +32,45 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GameServiceBotTurnTests {
+
+    @Test
+    void deckUsesConfiguredSingleSideDistribution() throws IOException {
+        CardCatalogService cardCatalogService = new CardCatalogService();
+        DeckService deckService = new DeckService(cardCatalogService);
+
+        List<CardInstance> deck = deckService.buildDeck("P1", "P2");
+
+        assertEquals(30, deck.size());
+        assertEquals(8, countCards(deck, cardCatalogService, CardType.CHARACTER, CardRarity.COMMON));
+        assertEquals(4, countCards(deck, cardCatalogService, CardType.CHARACTER, CardRarity.RARE));
+        assertEquals(12, countCards(deck, cardCatalogService, CardType.SKILL, CardRarity.COMMON));
+        assertEquals(6, countCards(deck, cardCatalogService, CardType.SKILL, CardRarity.RARE));
+
+        Map<String, Long> copies = deck.stream()
+                .map(CardInstance::getCardId)
+                .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
+        for (Map.Entry<String, Long> entry : copies.entrySet()) {
+            CardDefinition definition = cardCatalogService.require(entry.getKey());
+            int copyLimit = definition.getRarity() == CardRarity.RARE ? 2 : 3;
+            assertTrue(entry.getValue() <= copyLimit);
+        }
+    }
+
+    @Test
+    void createRoomStoresSingleSidePlayTypeAndInitializesBotMatch() throws IOException {
+        GameService service = createGameService();
+        CreateRoomRequest request = new CreateRoomRequest();
+        request.setBotMode(true);
+        request.setHostName("测试玩家");
+        request.setPlayType("SINGLE_SIDE");
+
+        MatchState match = service.createRoom(request);
+
+        assertEquals(MatchPlayType.SINGLE_SIDE, match.getPlayType());
+        assertEquals(2, match.getPlayers().size());
+        assertTrue(match.isReady());
+        assertEquals(GamePhase.ACTION, match.getPhase());
+    }
 
     @Test
     void endingTurnInBotModeHandlesSingleTargetSkillWithoutThrowing() throws IOException {
@@ -67,6 +114,45 @@ class GameServiceBotTurnTests {
     }
 
     @Test
+    void botAttacksWhenReadyBoardCharacterExists() throws IOException {
+        GameService service = createGameService();
+        CreateRoomRequest request = new CreateRoomRequest();
+        request.setBotMode(true);
+        request.setHostName("测试玩家");
+
+        MatchState match = service.createRoom(request);
+        PlayerState human = match.getPlayers().stream()
+                .filter(player -> "P1".equals(player.getPlayerId()))
+                .findFirst()
+                .orElseThrow();
+        PlayerState bot = match.getPlayers().stream()
+                .filter(player -> "P2".equals(player.getPlayerId()))
+                .findFirst()
+                .orElseThrow();
+
+        human.getBoard().clear();
+        CardInstance defender = new CardInstance("meal", human.getPlayerId(), 100);
+        human.getBoard().add(defender);
+        bot.getBoard().clear();
+        CardInstance attacker = new CardInstance("sim", bot.getPlayerId(), 70);
+        attacker.setSleeping(false);
+        bot.getBoard().add(attacker);
+        bot.getHand().clear();
+        match.setCurrentPlayerId(human.getPlayerId());
+        match.setPhase(GamePhase.ACTION);
+        match.setReady(true);
+        match.setTurn(2);
+        match.setDrawPile(new ArrayList<>());
+
+        MatchState result = service.endTurn(match.getMatchId(), human.getPlayerId());
+
+        assertEquals(70, defender.getCurrentHealth());
+        assertTrue(attacker.isSleeping());
+        assertEquals("P1", result.getCurrentPlayerId());
+        assertTrue(result.getLogs().stream().anyMatch(log -> log.contains("瓦库使用 电话卡 攻击了 饭卡")));
+    }
+
+    @Test
     void endingTurnDiscardsHandDownToLimit() throws IOException {
         GameService service = createGameService();
         CreateRoomRequest request = new CreateRoomRequest();
@@ -86,6 +172,7 @@ class GameServiceBotTurnTests {
         match.setCurrentPlayerId(human.getPlayerId());
         match.setPhase(GamePhase.ACTION);
         match.setReady(true);
+        match.setMode(BotMode.PVP);
         match.setDrawPile(new ArrayList<>());
 
         EndTurnRequest endTurnRequest = new EndTurnRequest();
@@ -208,6 +295,46 @@ class GameServiceBotTurnTests {
     }
 
     @Test
+    void chipsDiscardsAllRemainingHandAndDrawsOneMoreThanDiscarded() throws IOException {
+        GameService service = createGameService();
+        CreateRoomRequest request = new CreateRoomRequest();
+        request.setBotMode(true);
+        request.setHostName("测试玩家");
+
+        MatchState match = service.createRoom(request);
+        PlayerState human = match.getPlayers().stream()
+                .filter(player -> "P1".equals(player.getPlayerId()))
+                .findFirst()
+                .orElseThrow();
+
+        human.getHand().clear();
+        CardInstance chips = new CardInstance("chips", human.getPlayerId(), 0);
+        human.getHand().add(chips);
+        human.getHand().add(new CardInstance("meal", human.getPlayerId(), 100));
+        human.getHand().add(new CardInstance("sim", human.getPlayerId(), 70));
+        human.setActionPoints(3);
+        match.setDrawPile(new ArrayList<>(List.of(
+                new CardInstance("meal", human.getPlayerId(), 100),
+                new CardInstance("sim", human.getPlayerId(), 70),
+                new CardInstance("sniper", human.getPlayerId(), 30)
+        )));
+        match.setCurrentPlayerId(human.getPlayerId());
+        match.setPhase(GamePhase.ACTION);
+        match.setReady(true);
+
+        PlayEffectRequest playEffectRequest = new PlayEffectRequest();
+        playEffectRequest.setPlayerId(human.getPlayerId());
+        playEffectRequest.setHandInstanceId(chips.getInstanceId());
+
+        service.playSkill(match.getMatchId(), playEffectRequest);
+
+        assertEquals(3, human.getHand().size());
+        assertEquals(3, match.getDiscardPile().size());
+        assertTrue(match.getDiscardPile().stream().anyMatch(card -> "chips".equals(card.getCardId())));
+        assertEquals(0, match.getDrawPile().size());
+    }
+
+    @Test
     void invalidSodaTargetDoesNotPartiallyResolveSkill() throws IOException {
         GameService service = createGameService();
         CreateRoomRequest request = new CreateRoomRequest();
@@ -288,6 +415,56 @@ class GameServiceBotTurnTests {
                 .anyMatch(effect -> effect.getType() == StatusEffectType.ATTACK_UP && effect.getValue() == 10 && effect.getStacks() == 2));
     }
 
+    @Test
+    void rupanDiscardsRandomEnemyHandAfterAttackDamage() throws IOException {
+        GameService service = createGameService();
+        CreateRoomRequest request = new CreateRoomRequest();
+        request.setBotMode(true);
+        request.setHostName("测试玩家");
+
+        MatchState match = service.createRoom(request);
+        PlayerState human = match.getPlayers().stream()
+                .filter(player -> "P1".equals(player.getPlayerId()))
+                .findFirst()
+                .orElseThrow();
+        PlayerState bot = match.getPlayers().stream()
+                .filter(player -> "P2".equals(player.getPlayerId()))
+                .findFirst()
+                .orElseThrow();
+
+        human.getBoard().clear();
+        bot.getBoard().clear();
+        bot.getHand().clear();
+
+        CardInstance rupan = new CardInstance("rupan", human.getPlayerId(), 50);
+        rupan.setSleeping(false);
+        human.getBoard().add(rupan);
+        CardInstance defender = new CardInstance("meal", bot.getPlayerId(), 100);
+        bot.getBoard().add(defender);
+        bot.getHand().add(new CardInstance("sim", bot.getPlayerId(), 70));
+        bot.getHand().add(new CardInstance("sniper", bot.getPlayerId(), 30));
+
+        match.setCurrentPlayerId(human.getPlayerId());
+        match.setPhase(GamePhase.ACTION);
+        match.setReady(true);
+        match.setTurn(2);
+
+        AttackCharacterRequest attackRequest = new AttackCharacterRequest();
+        attackRequest.setPlayerId(human.getPlayerId());
+        attackRequest.setAttackerInstanceId(rupan.getInstanceId());
+        attackRequest.setDefenderInstanceId(defender.getInstanceId());
+
+        service.attackCharacter(match.getMatchId(), attackRequest);
+
+        assertEquals(1, bot.getHand().size());
+        assertEquals(60, defender.getCurrentHealth());
+        assertEquals(1, match.getDiscardPile().stream()
+                .filter(card -> bot.getPlayerId().equals(card.getOwnerId()))
+                .filter(card -> "sim".equals(card.getCardId()) || "sniper".equals(card.getCardId()))
+                .count());
+        assertTrue(match.getLogs().stream().anyMatch(log -> log.contains("猴子 触发特性")));
+    }
+
     private GameService createGameService() throws IOException {
         CardCatalogService cardCatalogService = new CardCatalogService();
         MatchSupportService matchSupportService = new MatchSupportService();
@@ -301,6 +478,7 @@ class GameServiceBotTurnTests {
                 battleService,
                 deckService
         );
+        MatchInitializerService matchInitializerService = new MatchInitializerService(deckService, statusEffectService);
         return new GameService(
                 cardCatalogService,
                 new GameWebSocketHandler(),
@@ -308,7 +486,17 @@ class GameServiceBotTurnTests {
                 deckService,
                 statusEffectService,
                 battleService,
-                skillResolverService
+                skillResolverService,
+                matchInitializerService,
+                0L
         );
+    }
+
+    private long countCards(List<CardInstance> deck, CardCatalogService cardCatalogService, CardType type, CardRarity rarity) {
+        return deck.stream()
+                .map(card -> cardCatalogService.require(card.getCardId()))
+                .filter(definition -> definition.getType() == type)
+                .filter(definition -> definition.getRarity() == rarity)
+                .count();
     }
 }

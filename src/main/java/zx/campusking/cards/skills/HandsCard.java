@@ -4,6 +4,8 @@ import zx.campusking.cards.BaseSkillCard;
 import zx.campusking.cards.CardEffectContext;
 import zx.campusking.model.CardDefinition;
 
+import java.util.List;
+
 public final class HandsCard extends BaseSkillCard {
 
     public static final String ID = "hands";
@@ -15,6 +17,6 @@ public final class HandsCard extends BaseSkillCard {
 
     @Override
     public void resolveSkill(CardEffectContext context) {
-        context.discardEnemyHand();
+        context.discardHand(context.enemy(), List.of(), context.value(), false);
     }
 }

@@ -24,7 +24,7 @@
     "description" : "上场首回合要预瞄, 无法行动.",
     "actionCost" : 2,
     "rarity" : "RARE",
-    "attack" : 9999,
+    "attack" : 999,
     "health" : 30
   }, {
     "id" : "robin",
@@ -48,6 +48,15 @@
     "rarity" : "RARE",
     "attack" : 70,
     "health" : 20
+  }, {
+    "id" : "rupan",
+    "name" : "猴子",
+    "type" : "CHARACTER",
+    "description" : "每次攻击造成伤害时, 弃置对方 1 张随机手牌.",
+    "actionCost" : 2,
+    "rarity" : "RARE",
+    "attack" : 40,
+    "health" : 50
   } ],
   "skills" : [ {
     "id" : "sanctuary",
@@ -137,7 +146,7 @@
     "id" : "chips",
     "name" : "赌徒筹码",
     "type" : "SKILL",
-    "description" : "弃置至多 3 张牌, 然后抽等量的牌数.",
+    "description" : "弃置所有手牌, 然后抽弃置数量 +1 张牌.",
     "actionCost" : 1,
     "rarity" : "COMMON",
     "effectType" : "DISCARD_AND_DRAW",

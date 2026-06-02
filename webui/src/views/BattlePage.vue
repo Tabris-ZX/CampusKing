@@ -205,6 +205,7 @@
                 <div class="pile-box action-point-box">
                   <span>行动点</span>
                   <strong>{{ selfActionPoints }} / 3</strong>
+                  <button class="pile-inline-action" type="button" @click="showDeckComposition = true">卡牌构成</button>
                 </div>
                 <div class="pile-pair">
                   <div class="pile-box compact-pile-box">
@@ -307,6 +308,45 @@
     </section>
   </main>
 
+  <div class="detail-modal" :class="{ visible: showDeckComposition }" @click.self="showDeckComposition = false">
+    <section v-if="showDeckComposition" class="deck-composition-dialog panel">
+      <button class="detail-close alt" type="button" @click="showDeckComposition = false">关闭</button>
+      <div class="deck-composition-head">
+        <span>对局牌堆</span>
+        <strong>卡牌构成</strong>
+        <small>共 {{ deckCompositionTotal }} 张</small>
+        <div class="deck-composition-summary">
+          <span class="deck-composition-tag type-character">角色 {{ deckCompositionStats.characters }}</span>
+          <span class="deck-composition-tag type-skill">技能 {{ deckCompositionStats.skills }}</span>
+          <span class="deck-composition-tag rarity-common">普通 {{ deckCompositionStats.common }}</span>
+          <span class="deck-composition-tag rarity-rare">稀有 {{ deckCompositionStats.rare }}</span>
+        </div>
+      </div>
+      <div class="deck-composition-list">
+        <div v-if="!deckComposition.length" class="deck-composition-empty">暂无卡牌</div>
+        <div
+          v-for="item in deckComposition"
+          :key="item.cardId"
+          class="deck-composition-row"
+          :class="[deckTypeTagClass(item.definition.type), deckRarityTagClass(item.definition.rarity)]"
+        >
+          <div>
+            <strong>{{ item.definition.name }}</strong>
+            <span class="deck-composition-tags">
+              <span class="deck-composition-tag" :class="deckTypeTagClass(item.definition.type)">
+                {{ describeType(item.definition.type) }}
+              </span>
+              <span class="deck-composition-tag" :class="deckRarityTagClass(item.definition.rarity)">
+                {{ describeRarity(item.definition.rarity) }}
+              </span>
+            </span>
+          </div>
+          <em>x{{ item.count }}</em>
+        </div>
+      </div>
+    </section>
+  </div>
+
   <div class="detail-modal" :class="{ visible: !!detailCard }" @click.self="detailCard = null">
     <div v-if="detailCard" class="detail-card">
       <button class="detail-close alt" type="button" @click="detailCard = null">关闭</button>
@@ -352,7 +392,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import AppTopbar from "../components/AppTopbar.vue";
-import { actionCostOf, api, buildInviteLink, cardImage, describeAttack, describeEffect, describeEffectCategory, describeEffectType, describeRarity, describeSkillRange, getInviteBlockedReason, isMissingRoomError, swapCardImageToFallback } from "../lib/game";
+import { actionCostOf, api, buildInviteLink, cardImage, describeAttack, describeEffect, describeEffectCategory, describeEffectType, describeRarity, describeSkillRange, describeType, getInviteBlockedReason, isMissingRoomError, swapCardImageToFallback } from "../lib/game";
 import { assetRoot, copyText, publicBaseUrl, wsGamePath, wsRoot } from "../lib/runtime-config";
 import { clearSession, ensureSessionPlayerName, loadSession, saveSession } from "../lib/session";
 import { showToast } from "../lib/toast";
@@ -374,6 +414,7 @@ const sacrificeMode = ref(false);
 const pollTimer = ref(null);
 const socket = ref(null);
 const detailCard = ref(null);
+const showDeckComposition = ref(false);
 const logsRef = ref(null);
 const highlightedLogKey = ref("");
 const summonedCardIds = ref([]);
@@ -526,6 +567,59 @@ const topDrawPileName = computed(() => {
   const topCard = match.value?.drawPile?.[0];
   return topCard ? cardDef(topCard.cardId).name : "空";
 });
+const deckComposition = computed(() => {
+  const counts = new Map();
+  const collectList = list => {
+    (list || []).forEach(card => {
+      const cardId = card?.cardId || card?.id;
+      if (!cardId) {
+        return;
+      }
+      counts.set(cardId, (counts.get(cardId) || 0) + 1);
+    });
+  };
+
+  collectList(match.value?.drawPile);
+  collectList(match.value?.discardPile);
+  (match.value?.players || []).forEach(player => {
+    collectList(player.hand);
+    collectList(player.board);
+  });
+
+  return Array.from(counts.entries())
+    .map(([cardId, count]) => ({
+      cardId,
+      count,
+      definition: cardDef(cardId)
+    }))
+    .sort((left, right) => {
+      const leftType = left.definition.type === "CHARACTER" ? 0 : 1;
+      const rightType = right.definition.type === "CHARACTER" ? 0 : 1;
+      if (leftType !== rightType) {
+        return leftType - rightType;
+      }
+      return String(left.definition.name || left.cardId).localeCompare(String(right.definition.name || right.cardId), "zh-Hans-CN");
+    });
+});
+const deckCompositionTotal = computed(() => deckComposition.value.reduce((total, item) => total + item.count, 0));
+const deckCompositionStats = computed(() => {
+  return deckComposition.value.reduce(
+    (stats, item) => {
+      if (item.definition.type === "CHARACTER") {
+        stats.characters += item.count;
+      } else if (item.definition.type === "SKILL") {
+        stats.skills += item.count;
+      }
+      if (item.definition.rarity === "RARE") {
+        stats.rare += item.count;
+      } else {
+        stats.common += item.count;
+      }
+      return stats;
+    },
+    { characters: 0, skills: 0, common: 0, rare: 0 }
+  );
+});
 const inviteBlockedReason = computed(() => {
   if (!roomCode.value) {
     return "当前没有可分享的房间";
@@ -602,6 +696,14 @@ function cardImageFor(cardId) {
 
 function cardMark(cardId) {
   return cardDef(cardId).type === "SKILL" ? "技" : "角";
+}
+
+function deckTypeTagClass(type) {
+  return type === "CHARACTER" ? "type-character" : type === "SKILL" ? "type-skill" : "";
+}
+
+function deckRarityTagClass(rarity) {
+  return rarity === "RARE" ? "rarity-rare" : "rarity-common";
 }
 
 function describePhase(phase) {
@@ -802,6 +904,11 @@ function processMatchAnimations(nextMatch, previousMatch) {
 
   const previousPlayers = previousMatch.players || [];
   const nextPlayers = nextMatch.players || [];
+  const previousDrawPileSize = previousMatch.drawPile?.length || 0;
+  const nextDrawPileSize = nextMatch.drawPile?.length || 0;
+  if (nextDrawPileSize < previousDrawPileSize) {
+    pulseDraw(1000);
+  }
 
   nextPlayers.forEach(nextPlayer => {
     const previousPlayer = previousPlayers.find(player => player.playerId === nextPlayer.playerId);
@@ -838,7 +945,7 @@ function processMatchAnimations(nextMatch, previousMatch) {
         .filter(instanceId => !previousHandIds.has(instanceId));
       if (newHandIds.length) {
         flashIds(drawnHandIds, newHandIds, 1100);
-        pulseDraw(900);
+        pulseDraw(1000);
       }
     }
   });
@@ -883,6 +990,7 @@ function resetLocalBattleState() {
   pendingSkillTarget.value = null;
   sacrificeMode.value = false;
   detailCard.value = null;
+  showDeckComposition.value = false;
   highlightedLogKey.value = "";
   summonedCardIds.value = [];
   attackingCardIds.value = [];
@@ -1394,6 +1502,10 @@ function openDetail(instance) {
 
 function onKeydown(event) {
   if (event.key === "Escape") {
+    if (showDeckComposition.value) {
+      showDeckComposition.value = false;
+      return;
+    }
     if (detailCard.value) {
       detailCard.value = null;
       return;

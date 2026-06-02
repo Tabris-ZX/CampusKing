@@ -14,6 +14,7 @@ import zx.campusking.service.MatchSupportService;
 import zx.campusking.service.StatusEffectService;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -48,18 +49,24 @@ public record CardEffectContext(
     }
 
     /**
-     * 让技能使用者抽 1 张牌。
+     * 让技能使用者抽指定数量的牌。
      */
-    public void drawOne() {
-        deckService.drawOne(match, player);
+    public int drawCards(PlayerState targetPlayer, int count) {
+        int drawCount = Math.max(0, count);
+        int before = targetPlayer.getHand().size();
+        for (int index = 0; index < drawCount; index += 1) {
+            deckService.drawOne(match, targetPlayer);
+        }
+        return Math.max(0, targetPlayer.getHand().size() - before);
     }
 
     /**
-     * 让技能使用者获得 1 点行动点，可超过回合上限。
+     * 让技能使用者获得指定数量行动点，可超过回合上限。
      */
-    public void gainActionPoint() {
-        player.setActionPoints(player.getActionPoints() + 1);
-        match.getLogs().add(player.getName() + " 获得了 1 点行动点.");
+    public void gainActionPoints(int count) {
+        int gain = Math.max(0, count);
+        player.setActionPoints(player.getActionPoints() + gain);
+        match.getLogs().add(player.getName() + " 获得了 " + gain + " 点行动点.");
     }
 
     /**
@@ -71,17 +78,18 @@ public record CardEffectContext(
     }
 
     /**
-     * 把圣域类全局增益分发给目标玩家场上的每名角色。
+     * 给目标角色添加一个状态效果。
      */
-    public void applyGlobalBuff(PlayerState target) {
-        int value = value();
-        int duration = duration(2);
-        for (CardInstance card : target.getBoard()) {
-            statusEffectService.applyOrRefreshEffect(card, new StatusEffect(StatusEffectType.ATTACK_UP, "buff", value, 1, duration, definition.getId()));
-            statusEffectService.applyOrRefreshEffect(card, new StatusEffect(StatusEffectType.MAX_HP_UP, "buff", value, 1, duration, definition.getId()));
-            statusEffectService.applyOrRefreshEffect(card, new StatusEffect(StatusEffectType.TURN_HEAL, "buff", value, 1, duration, definition.getId()));
-            int maxHealth = statusEffectService.effectiveMaxHealth(target, card);
-            card.setCurrentHealth(Math.min(maxHealth, card.getCurrentHealth() + value));
+    public void applyCardBuff(CardInstance target, StatusEffectType type, int value, int stacks, Integer remainingTurns) {
+        statusEffectService.applyOrRefreshEffect(target, new StatusEffect(type, "buff", Math.max(0, value), Math.max(1, stacks), remainingTurns, definition.getId()));
+    }
+
+    /**
+     * 给目标玩家场上每名角色添加一个状态效果。
+     */
+    public void applyBoardBuff(PlayerState targetPlayer, StatusEffectType type, int value, int stacks, Integer remainingTurns) {
+        for (CardInstance card : targetPlayer.getBoard()) {
+            applyCardBuff(card, type, value, stacks, remainingTurns);
         }
     }
 
@@ -106,56 +114,90 @@ public record CardEffectContext(
     }
 
     /**
-     * 对敌方场上全部角色造成当前技能数值的伤害。
+     * 治疗目标角色。
      */
-    public void damageAllEnemies() {
-        if (statusEffectService.consumeActionPrevention(enemy, match, PreventableAction.SKILL_CARD, definition.getName())) {
-            return;
-        }
-        for (CardInstance target : enemy.getBoard()) {
-            target.setCurrentHealth(target.getCurrentHealth() - value());
-        }
-        battleService.cleanupDefeated(match, enemy, player, deckService);
+    public void healCharacter(PlayerState owner, CardInstance target, int amount) {
+        int heal = Math.max(0, amount);
+        int maxHealth = statusEffectService.effectiveMaxHealth(owner, target);
+        target.setCurrentHealth(Math.min(maxHealth, target.getCurrentHealth() + heal));
+        match.getLogs().add(battleService.cardName(target) + " 恢复了 " + heal + " 点生命.");
     }
 
     /**
-     * 汽水类单体角色修改：目标是己方角色时治疗，目标是敌方角色时造成伤害。
+     * 对目标角色造成伤害，并处理死亡清理和击败奖励。
      */
-    public void modifyUnit() {
-        if (request.getTargetPlayerId() == null || request.getTargetPlayerId().isBlank()) {
-            throw new IllegalArgumentException("汽水需要指定目标角色。");
+    public void damageCharacter(PlayerState owner, CardInstance target, int amount) {
+        if (owner.getPlayerId().equals(enemy.getPlayerId()) && statusEffectService.consumeActionPrevention(enemy, match, PreventableAction.SKILL_CARD, definition.getName())) {
+            return;
         }
-        PlayerState targetPlayer = request.getTargetPlayerId().equals(player.getPlayerId()) ? player : enemy;
+        target.setCurrentHealth(target.getCurrentHealth() - Math.max(0, amount));
+        battleService.cleanupDefeated(match, owner, player, deckService);
+        match.getLogs().add(battleService.cardName(target) + " 受到了 " + Math.max(0, amount) + " 点伤害.");
+    }
+
+    /**
+     * 读取本次技能请求指定的场上角色。
+     */
+    public CardInstance targetBoardCard(PlayerState owner) {
         if (request.getTargetInstanceId() == null || request.getTargetInstanceId().isBlank()) {
-            throw new IllegalArgumentException("汽水只能指定场上的角色。");
+            throw new IllegalArgumentException("需要指定目标角色。");
         }
-        if (targetPlayer.getPlayerId().equals(player.getPlayerId())) {
-            CardInstance target = matchSupportService.requireBoardCard(player, request.getTargetInstanceId());
-            int maxHealth = statusEffectService.effectiveMaxHealth(player, target);
-            target.setCurrentHealth(Math.min(maxHealth, target.getCurrentHealth() + value()));
-            match.getLogs().add(battleService.cardName(target) + " 恢复了 " + value() + " 点生命.");
-            return;
-        }
-
-        CardInstance target = matchSupportService.requireBoardCard(enemy, request.getTargetInstanceId());
-        if (!statusEffectService.consumeActionPrevention(enemy, match, PreventableAction.SKILL_CARD, definition.getName())) {
-            target.setCurrentHealth(target.getCurrentHealth() - value());
-        }
-        battleService.cleanupDefeated(match, enemy, player, deckService);
-        match.getLogs().add(battleService.cardName(target) + " 受到了 " + value() + " 点伤害.");
+        return matchSupportService.requireBoardCard(owner, request.getTargetInstanceId());
     }
 
     /**
-     * 弃置使用者指定的至多 3 张手牌，然后抽取等量卡牌。
+     * 判断本次技能请求是否指定了使用者自己的角色。
      */
-    public void discardAndDraw() {
-        List<String> discardIds = request.getDiscardInstanceIds() == null ? List.of() : request.getDiscardInstanceIds();
-        if (discardIds.size() > 3) {
-            throw new IllegalArgumentException("最多只能弃置 3 张牌。");
+    public boolean targetsSelfBoard() {
+        return player.getPlayerId().equals(request.getTargetPlayerId());
+    }
+
+    /**
+     * 判断本次技能请求是否指定了对手的角色。
+     */
+    public boolean targetsEnemyBoard() {
+        return enemy.getPlayerId().equals(request.getTargetPlayerId());
+    }
+
+    /**
+     * 对目标玩家场上全部角色造成伤害。
+     */
+    public void damageBoard(PlayerState owner, int amount) {
+        if (owner.getPlayerId().equals(enemy.getPlayerId()) && statusEffectService.consumeActionPrevention(enemy, match, PreventableAction.SKILL_CARD, definition.getName())) {
+            return;
         }
+        for (CardInstance target : owner.getBoard()) {
+            target.setCurrentHealth(target.getCurrentHealth() - Math.max(0, amount));
+        }
+        battleService.cleanupDefeated(match, owner, player, deckService);
+    }
+
+    /**
+     * 从目标玩家手牌中弃置指定数量的牌。
+     *
+     * @param targetPlayer 被弃牌玩家
+     * @param requestedIds 指定弃置的手牌 id；为空时按 random 决定随机或从左到右
+     * @param count 弃置数量上限
+     * @param random 未指定 requestedIds 时是否随机弃置
+     * @return 实际弃置的牌
+     */
+    public List<CardInstance> discardHand(PlayerState targetPlayer, List<String> requestedIds, int count, boolean random) {
+        int discardLimit = Math.max(0, count);
+        if (discardLimit <= 0 || targetPlayer.getHand().isEmpty()) {
+            return List.of();
+        }
+        List<String> discardIds = requestedIds == null ? List.of() : requestedIds.stream()
+                .filter(id -> id != null && !id.isBlank())
+                .distinct()
+                .limit(discardLimit)
+                .toList();
         if (discardIds.isEmpty()) {
-            discardIds = player.getHand().stream()
-                    .limit(Math.min(3, player.getHand().size()))
+            List<CardInstance> candidates = new ArrayList<>(targetPlayer.getHand());
+            if (random) {
+                Collections.shuffle(candidates);
+            }
+            discardIds = candidates.stream()
+                    .limit(Math.min(discardLimit, candidates.size()))
                     .map(CardInstance::getInstanceId)
                     .toList();
         }
@@ -165,26 +207,22 @@ public record CardEffectContext(
             if (discardId == null || discardId.isBlank()) {
                 continue;
             }
-            CardInstance card = matchSupportService.removeFromHand(player, discardId);
+            CardInstance card = matchSupportService.removeFromHand(targetPlayer, discardId);
             discarded.add(card);
             match.getDiscardPile().add(card);
         }
-        for (int index = 0; index < discarded.size(); index += 1) {
-            deckService.drawOne(match, player);
+        if (!discarded.isEmpty()) {
+            match.getLogs().add(targetPlayer.getName() + " 弃置了 " + discarded.size() + " 张手牌: " + cardNames(discarded) + ".");
         }
-        match.getLogs().add(player.getName() + " 弃置了 " + discarded.size() + " 张牌并抽取等量卡牌.");
+        return discarded;
     }
 
-    /**
-     * 弃置敌方第一张手牌。
-     */
-    public void discardEnemyHand() {
-        if (enemy.getHand().isEmpty()) {
-            match.getLogs().add(enemy.getName() + " 没有手牌可弃置.");
-            return;
-        }
-        CardInstance discarded = enemy.getHand().remove(0);
-        match.getDiscardPile().add(discarded);
-        match.getLogs().add(enemy.getName() + " 被弃置了 1 张手牌.");
+    private String cardNames(List<CardInstance> cards) {
+        return cards.stream()
+                .map(battleService::cardName)
+                .toList()
+                .toString()
+                .replace("[", "")
+                .replace("]", "");
     }
 }

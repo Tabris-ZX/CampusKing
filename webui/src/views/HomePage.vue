@@ -89,6 +89,20 @@
         <p class="eyebrow">Create</p>
         <h2>创建房间</h2>
         <p class="entry-copy">创建后会自动以房主身份进入对局。</p>
+        <div class="play-type-options" role="radiogroup" aria-label="玩法选择">
+          <button
+            v-for="option in playTypeOptions"
+            :key="option.value"
+            class="play-type-option"
+            :class="{ active: playType === option.value }"
+            type="button"
+            :disabled="option.disabled"
+            @click="playType = option.value"
+          >
+            <span>{{ option.label }}</span>
+            <small>{{ option.description }}</small>
+          </button>
+        </div>
         <label class="checkbox-row">
           <input v-model="botMode" type="checkbox">
           <span>创建人机模式房间</span>
@@ -135,6 +149,11 @@ const currentMatch = ref(null);
 const playerNameInput = ref("");
 const roomCodeInput = ref("");
 const botMode = ref(false);
+const playType = ref("SINGLE_SIDE");
+const playTypeOptions = [
+  { value: "SINGLE_SIDE", label: "单面玩法", description: "当前基础玩法" },
+  { value: "DOUBLE_SIDE", label: "双面玩法", description: "暂未开放", disabled: true }
+];
 const entryMode = ref("");
 
 const displayPlayerName = computed(() => playerNameInput.value || session.value.playerName || ensureSessionPlayerName(session.value));
@@ -201,7 +220,8 @@ async function createRoom() {
       body: JSON.stringify({
         hostName: playerName,
         playerToken,
-        botMode: botMode.value
+        botMode: botMode.value,
+        playType: playType.value
       })
     });
     session.value = {

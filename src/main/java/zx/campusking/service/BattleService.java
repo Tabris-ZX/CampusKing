@@ -60,12 +60,13 @@ public class BattleService {
     /**
      * 对角色造成伤害并写入日志。
      */
-    public void damageCharacter(MatchState match, CardInstance source, CardInstance target, int damage) {
-        if (target.getCurrentHealth() <= 0) {
-            return;
+    public boolean damageCharacter(MatchState match, CardInstance source, CardInstance target, int damage) {
+        if (target.getCurrentHealth() <= 0 || damage <= 0) {
+            return false;
         }
         target.setCurrentHealth(target.getCurrentHealth() - damage);
         match.getLogs().add(cardName(source) + " 对 " + cardName(target) + " 造成了 " + damage + " 点伤害.");
+        return true;
     }
 
     /**

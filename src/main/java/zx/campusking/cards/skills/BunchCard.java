@@ -15,6 +15,6 @@ public final class BunchCard extends BaseSkillCard {
 
     @Override
     public void resolveSkill(CardEffectContext context) {
-        context.damageAllEnemies();
+        context.damageBoard(context.enemy(), context.value());
     }
 }

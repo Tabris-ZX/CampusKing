@@ -1,12 +1,15 @@
 package zx.campusking.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import zx.campusking.cards.CardAttackDamageContext;
 import zx.campusking.model.BotMode;
 import zx.campusking.model.CardDefinition;
 import zx.campusking.model.CardInstance;
 import zx.campusking.model.CardType;
 import zx.campusking.model.GamePhase;
+import zx.campusking.model.MatchPlayType;
 import zx.campusking.model.MatchState;
 import zx.campusking.model.PlayerState;
 import zx.campusking.model.PreventableAction;
@@ -23,13 +26,17 @@ import zx.campusking.model.dto.SummonRequest;
 import zx.campusking.websocket.GameWebSocketHandler;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 对局编排服务。
@@ -53,14 +60,27 @@ public class GameService {
     private final BattleService battleService;
     /** 技能结算服务。 */
     private final SkillResolverService skillResolverService;
+    /** 对局初始化服务。 */
+    private final MatchInitializerService matchInitializerService;
     /** 用于广播对局快照。 */
     private final ObjectMapper objectMapper = new ObjectMapper();
+    /** 机器人每步操作间隔, 默认 1 秒。 */
+    private final long botActionDelayMs;
+    /** 机器人动作调度线程。 */
+    private final ScheduledExecutorService botExecutor = Executors.newSingleThreadScheduledExecutor(runnable -> {
+        Thread thread = new Thread(runnable, "campusking-bot-turn");
+        thread.setDaemon(true);
+        return thread;
+    });
 
     /** 当前所有对局，键为 matchId。 */
     private final Map<String, MatchState> matches = new LinkedHashMap<>();
     /** 房间码到 matchId 的映射。 */
     private final Map<String, String> roomIndex = new LinkedHashMap<>();
+    /** 正在异步执行机器人回合的对局 id。 */
+    private final Set<String> activeBotTurns = ConcurrentHashMap.newKeySet();
 
+    @Autowired
     public GameService(
             CardCatalogService cardCatalogService,
             GameWebSocketHandler gameWebSocketHandler,
@@ -68,7 +88,32 @@ public class GameService {
             DeckService deckService,
             StatusEffectService statusEffectService,
             BattleService battleService,
-            SkillResolverService skillResolverService
+            SkillResolverService skillResolverService,
+            MatchInitializerService matchInitializerService
+    ) {
+        this(
+                cardCatalogService,
+                gameWebSocketHandler,
+                matchSupportService,
+                deckService,
+                statusEffectService,
+                battleService,
+                skillResolverService,
+                matchInitializerService,
+                Long.getLong("campusking.botActionDelayMs", 1000L)
+        );
+    }
+
+    GameService(
+            CardCatalogService cardCatalogService,
+            GameWebSocketHandler gameWebSocketHandler,
+            MatchSupportService matchSupportService,
+            DeckService deckService,
+            StatusEffectService statusEffectService,
+            BattleService battleService,
+            SkillResolverService skillResolverService,
+            MatchInitializerService matchInitializerService,
+            long botActionDelayMs
     ) {
         this.cardCatalogService = cardCatalogService;
         this.gameWebSocketHandler = gameWebSocketHandler;
@@ -77,6 +122,8 @@ public class GameService {
         this.statusEffectService = statusEffectService;
         this.battleService = battleService;
         this.skillResolverService = skillResolverService;
+        this.matchInitializerService = matchInitializerService;
+        this.botActionDelayMs = Math.max(0, botActionDelayMs);
     }
 
     /**
@@ -88,6 +135,7 @@ public class GameService {
         match.setMatchId(UUID.randomUUID().toString());
         match.setRoomCode(generateRoomCode());
         match.setMode(Boolean.TRUE.equals(request.getBotMode()) ? BotMode.PVE : BotMode.PVP);
+        match.setPlayType(resolvePlayType(request.getPlayType()));
         match.setPlayers(new ArrayList<>(List.of(
                 new PlayerState("P1", matchSupportService.defaultName(request.getHostName(), "房主"), normalizeOrCreateToken(request.getPlayerToken()))
         )));
@@ -97,10 +145,10 @@ public class GameService {
         match.setReady(false);
 
         if (Boolean.TRUE.equals(request.getBotMode())) {
-            match.getLogs().add("人机房间已创建.");
+            match.getLogs().add("人机房间已创建, 玩法: " + playTypeName(match.getPlayType()) + ".");
             addBotOpponent(match);
         } else {
-            match.getLogs().add("房间已创建, 等待第二位玩家加入.");
+            match.getLogs().add("房间已创建, 玩法: " + playTypeName(match.getPlayType()) + ", 等待第二位玩家加入.");
         }
 
         matches.put(match.getMatchId(), match);
@@ -122,17 +170,8 @@ public class GameService {
         PlayerState playerB = new PlayerState("P2", matchSupportService.defaultName(request.getPlayerName(), "玩家B"), normalizeOrCreateToken(request.getPlayerToken()));
         match.getPlayers().add(playerB);
 
-        List<CardInstance> deck = deckService.buildDeck(match.getPlayers().get(0).getPlayerId(), playerB.getPlayerId());
-        Collections.shuffle(deck);
-        match.setDrawPile(deck);
-        match.setReady(true);
         match.getLogs().add(playerB.getName() + " 已加入房间.");
-
-        for (int i = 0; i < 2; i++) {
-            deckService.drawOne(match, match.getPlayers().get(0));
-            deckService.drawOne(match, playerB);
-        }
-        startTurn(match, match.getPlayers().get(0));
+        matchInitializerService.initialize(match);
 
         broadcastMatch(match);
         return match;
@@ -213,7 +252,8 @@ public class GameService {
         matchSupportService.ensureReady(match);
         matchSupportService.ensurePhase(match, GamePhase.DRAW);
 
-        startTurn(match, player);
+        matchInitializerService.startTurn(match, player);
+        checkWinner(match);
 
         broadcastMatch(match);
         return match;
@@ -348,8 +388,17 @@ public class GameService {
 
         int attackValue = battleService.computeAttack(player, attacker);
         boolean attackPrevented = statusEffectService.consumeActionPrevention(enemy, match, PreventableAction.CHARACTER_ATTACK, battleService.cardName(attacker) + " 的攻击");
-        if (!attackPrevented) {
-            battleService.damageCharacter(match, attacker, defender, attackValue);
+        if (!attackPrevented && battleService.damageCharacter(match, attacker, defender, attackValue)) {
+            cardCatalogService.requireCard(attacker.getCardId())
+                    .afterAttackDamage(new CardAttackDamageContext(
+                            match,
+                            player,
+                            enemy,
+                            attacker,
+                            cardCatalogService.require(attacker.getCardId()),
+                            attackValue,
+                            battleService
+                    ));
         }
 
         attacker.setSleeping(true);
@@ -379,8 +428,20 @@ public class GameService {
         CardInstance attacker = matchSupportService.requireBoardCard(player, request.getAttackerInstanceId());
         battleService.ensureCanAttack(match, attacker);
 
-        if (!statusEffectService.consumeActionPrevention(enemy, match, PreventableAction.CHARACTER_ATTACK, battleService.cardName(attacker) + " 的攻击")) {
-            enemy.setHp(Math.max(0, enemy.getHp() - battleService.computeAttack(player, attacker)));
+        int attackValue = battleService.computeAttack(player, attacker);
+        if (!statusEffectService.consumeActionPrevention(enemy, match, PreventableAction.CHARACTER_ATTACK, battleService.cardName(attacker) + " 的攻击")
+                && attackValue > 0) {
+            enemy.setHp(Math.max(0, enemy.getHp() - attackValue));
+            cardCatalogService.requireCard(attacker.getCardId())
+                    .afterAttackDamage(new CardAttackDamageContext(
+                            match,
+                            player,
+                            enemy,
+                            attacker,
+                            cardCatalogService.require(attacker.getCardId()),
+                            attackValue,
+                            battleService
+                    ));
         }
 
         attacker.setSleeping(true);
@@ -414,39 +475,12 @@ public class GameService {
         match.setCurrentPlayerId(enemy.getPlayerId());
         match.setTurn(match.getTurn() + 1);
         match.getLogs().add(player.getName() + " 结束了回合.");
-        startTurn(match, enemy);
+        matchInitializerService.startTurn(match, enemy);
+        checkWinner(match);
 
         broadcastMatch(match);
         runBotTurnIfNeeded(match);
         return match;
-    }
-
-    /**
-     * 回合开始自动抽 2 张牌并进入行动阶段。
-     */
-    private void startTurn(MatchState match, PlayerState player) {
-        player.setSummonsThisTurn(0);
-        player.setActionPoints(PlayerState.MAX_ACTION_POINTS);
-        deckService.drawOne(match, player);
-        deckService.drawOne(match, player);
-        statusEffectService.tickStatusDurations(player, match);
-        statusEffectService.applyTurnStartEffects(match, player);
-        checkWinner(match);
-        if (match.getPhase() == GamePhase.FINISHED) {
-            return;
-        }
-        wakeBoard(player);
-        match.setPhase(GamePhase.ACTION);
-        match.getLogs().add(player.getName() + " 自动抽了 2 张牌.");
-    }
-
-    /**
-     * 每回合开始时，场上角色都会从休整状态恢复为可行动。
-     */
-    private void wakeBoard(PlayerState player) {
-        for (CardInstance card : player.getBoard()) {
-            card.setSleeping(false);
-        }
     }
 
     /**
@@ -481,6 +515,21 @@ public class GameService {
         return token == null || token.isBlank() ? generatePlayerToken() : token.trim();
     }
 
+    private MatchPlayType resolvePlayType(String value) {
+        if (value == null || value.isBlank()) {
+            return MatchPlayType.SINGLE_SIDE;
+        }
+        try {
+            return MatchPlayType.valueOf(value.trim().toUpperCase());
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("未知玩法类型: " + value);
+        }
+    }
+
+    private String playTypeName(MatchPlayType playType) {
+        return playType == MatchPlayType.DOUBLE_SIDE ? "双面玩法" : "单面玩法";
+    }
+
     /**
      * 在人机模式下补入一个最小可用的机器人对手。
      * 当前只负责占位和发牌，后续可继续扩展自动出牌逻辑。
@@ -488,80 +537,224 @@ public class GameService {
     private void addBotOpponent(MatchState match) {
         PlayerState bot = new PlayerState("P2", "瓦库", "BOT");
         match.getPlayers().add(bot);
-        List<CardInstance> deck = deckService.buildDeck(match.getPlayers().get(0).getPlayerId(), bot.getPlayerId());
-        Collections.shuffle(deck);
-        match.setDrawPile(deck);
-        match.setReady(true);
         match.getLogs().add("瓦库已加入房间.");
-        for (int i = 0; i < 2; i++) {
-            deckService.drawOne(match, match.getPlayers().get(0));
-            deckService.drawOne(match, bot);
-        }
-        startTurn(match, match.getPlayers().get(0));
+        matchInitializerService.initialize(match);
     }
 
-    /**
-     * 最小可用的人机逻辑：
-     * 机器人在自己的回合会抽牌，然后从左到右优先召唤第一张角色牌；
-     * 如果没有角色牌，则使用第一张技能牌；最后结束回合。
-     */
     private void runBotTurnIfNeeded(MatchState match) {
         if (match.getMode() != BotMode.PVE || !"P2".equals(match.getCurrentPlayerId()) || match.getPhase() == GamePhase.FINISHED) {
             return;
         }
+        if (!activeBotTurns.add(match.getMatchId())) {
+            return;
+        }
+        if (botActionDelayMs <= 0) {
+            runBotTurnImmediately(match.getMatchId());
+            return;
+        }
+        scheduleBotStep(match.getMatchId());
+    }
 
-        PlayerState bot = matchSupportService.requirePlayer(match, "P2");
-        matchSupportService.ensureActionPhase(match);
+    private void scheduleBotStep(String matchId) {
+        botExecutor.schedule(() -> executeBotStep(matchId), botActionDelayMs, TimeUnit.MILLISECONDS);
+    }
 
-        CardInstance firstCharacter = bot.getHand().stream()
-                .filter(card -> cardCatalogService.require(card.getCardId()).getType() == CardType.CHARACTER)
-                .findFirst()
-                .orElse(null);
-
-        if (firstCharacter != null && bot.getBoard().size() < PlayerState.SUMMON_SLOTS) {
-            CardDefinition definition = cardCatalogService.require(firstCharacter.getCardId());
-            if (hasActionPoints(bot, actionCost(definition))) {
-                consumeActionPoints(bot, actionCost(definition));
-                bot.getHand().remove(firstCharacter);
-                firstCharacter.setSleeping(cardCatalogService.requireCard(definition.getId()).sleepsOnSummon());
-                bot.getBoard().add(firstCharacter);
-                bot.setSummonsThisTurn(1);
-                match.getLogs().add("瓦库消耗 " + actionCost(definition) + " 点行动点, 召唤了 " + definition.getName() + ".");
+    private void runBotTurnImmediately(String matchId) {
+        boolean continueTurn = true;
+        while (continueTurn) {
+            MatchState match = matches.get(matchId);
+            if (match == null) {
+                activeBotTurns.remove(matchId);
+                return;
             }
-        } else {
-            PlayerState player = matchSupportService.requirePlayer(match, "P1");
-            CardInstance firstSkill = bot.getHand().stream()
-                    .filter(card -> cardCatalogService.require(card.getCardId()).getType() == CardType.SKILL)
-                    .filter(card -> hasActionPoints(bot, actionCost(cardCatalogService.require(card.getCardId()))))
-                    .filter(card -> canBotPrepareSkill(match, bot, player, card))
-                    .findFirst()
-                    .orElse(null);
-            if (firstSkill != null) {
-                CardDefinition definition = cardCatalogService.require(firstSkill.getCardId());
-                PlayEffectRequest request = new PlayEffectRequest();
-                request.setPlayerId("P2");
-                request.setHandInstanceId(firstSkill.getInstanceId());
-                assignBotSkillTarget(bot, player, definition, request);
-                consumeActionPoints(bot, actionCost(definition));
-                bot.getHand().remove(firstSkill);
-                skillResolverService.resolveEffect(match, bot, player, definition, request);
-                match.getDiscardPile().add(firstSkill);
-                match.getLogs().add("瓦库消耗 " + actionCost(definition) + " 点行动点, 使用了技能 " + definition.getName() + ".");
-                checkWinner(match);
+            synchronized (match) {
+                if (match.getMode() != BotMode.PVE || !"P2".equals(match.getCurrentPlayerId()) || match.getPhase() == GamePhase.FINISHED) {
+                    activeBotTurns.remove(matchId);
+                    return;
+                }
+                try {
+                    continueTurn = performBotStep(match);
+                } catch (RuntimeException exception) {
+                    endBotTurnAfterError(match);
+                    broadcastMatch(match);
+                    activeBotTurns.remove(matchId);
+                    return;
+                }
+                broadcastMatch(match);
             }
         }
+        activeBotTurns.remove(matchId);
+    }
 
-        if (match.getPhase() == GamePhase.FINISHED) {
-            broadcastMatch(match);
+    private void executeBotStep(String matchId) {
+        MatchState match = matches.get(matchId);
+        if (match == null) {
+            activeBotTurns.remove(matchId);
             return;
+        }
+
+        boolean continueTurn;
+        try {
+            synchronized (match) {
+                if (match.getMode() != BotMode.PVE || !"P2".equals(match.getCurrentPlayerId()) || match.getPhase() == GamePhase.FINISHED) {
+                    activeBotTurns.remove(matchId);
+                    return;
+                }
+                continueTurn = performBotStep(match);
+                broadcastMatch(match);
+            }
+        } catch (RuntimeException exception) {
+            synchronized (match) {
+                endBotTurnAfterError(match);
+                broadcastMatch(match);
+            }
+            activeBotTurns.remove(matchId);
+            return;
+        }
+
+        if (continueTurn) {
+            scheduleBotStep(matchId);
+        } else {
+            activeBotTurns.remove(matchId);
+        }
+    }
+
+    private void endBotTurnAfterError(MatchState match) {
+        match.getLogs().add("瓦库操作异常, 自动结束回合.");
+        PlayerState player = matchSupportService.requirePlayer(match, "P1");
+        match.setCurrentPlayerId("P1");
+        match.setTurn(match.getTurn() + 1);
+        matchInitializerService.startTurn(match, player);
+        checkWinner(match);
+    }
+
+    private boolean performBotStep(MatchState match) {
+        PlayerState bot = matchSupportService.requirePlayer(match, "P2");
+        PlayerState player = matchSupportService.requirePlayer(match, "P1");
+        matchSupportService.ensureActionPhase(match);
+
+        if (performBotAttack(match, bot, player)) {
+            return match.getPhase() != GamePhase.FINISHED;
+        }
+        if (performBotSummon(match, bot)) {
+            return true;
+        }
+        if (performBotSkill(match, bot, player)) {
+            return match.getPhase() != GamePhase.FINISHED;
         }
 
         discardDownToHandLimit(match, bot, null, true);
         match.setCurrentPlayerId("P1");
         match.setTurn(match.getTurn() + 1);
         match.getLogs().add("瓦库结束了回合.");
-        startTurn(match, matchSupportService.requirePlayer(match, "P1"));
-        broadcastMatch(match);
+        matchInitializerService.startTurn(match, player);
+        checkWinner(match);
+        return false;
+    }
+
+    private boolean performBotAttack(MatchState match, PlayerState bot, PlayerState player) {
+        CardInstance attacker = bot.getBoard().stream()
+                .filter(card -> !card.isSleeping())
+                .findFirst()
+                .orElse(null);
+        if (attacker == null) {
+            return false;
+        }
+
+        battleService.ensureCanAttack(match, attacker);
+        int attackValue = battleService.computeAttack(bot, attacker);
+        boolean attackPrevented = statusEffectService.consumeActionPrevention(player, match, PreventableAction.CHARACTER_ATTACK, battleService.cardName(attacker) + " 的攻击");
+
+        if (player.getBoard().isEmpty()) {
+            if (!attackPrevented && attackValue > 0) {
+                player.setHp(Math.max(0, player.getHp() - attackValue));
+                cardCatalogService.requireCard(attacker.getCardId())
+                        .afterAttackDamage(new CardAttackDamageContext(
+                                match,
+                                bot,
+                                player,
+                                attacker,
+                                cardCatalogService.require(attacker.getCardId()),
+                                attackValue,
+                                battleService
+                        ));
+            }
+            attacker.setSleeping(true);
+            match.getLogs().add("瓦库使用 " + battleService.cardName(attacker) + " 直接攻击了玩家 " + player.getName() + ".");
+            checkWinner(match);
+            return true;
+        }
+
+        CardInstance defender = player.getBoard().get(0);
+        if (!attackPrevented && battleService.damageCharacter(match, attacker, defender, attackValue)) {
+            cardCatalogService.requireCard(attacker.getCardId())
+                    .afterAttackDamage(new CardAttackDamageContext(
+                            match,
+                            bot,
+                            player,
+                            attacker,
+                            cardCatalogService.require(attacker.getCardId()),
+                            attackValue,
+                            battleService
+                    ));
+        }
+        attacker.setSleeping(true);
+        battleService.cleanupDefeated(match, player, bot, deckService);
+        match.getLogs().add("瓦库使用 " + battleService.cardName(attacker) + " 攻击了 " + battleService.cardName(defender) + ".");
+        checkWinner(match);
+        return true;
+    }
+
+    private boolean performBotSummon(MatchState match, PlayerState bot) {
+        if (bot.getBoard().size() >= PlayerState.SUMMON_SLOTS || bot.getSummonsThisTurn() >= 1) {
+            return false;
+        }
+        CardInstance firstCharacter = bot.getHand().stream()
+                .filter(card -> cardCatalogService.require(card.getCardId()).getType() == CardType.CHARACTER)
+                .filter(card -> hasActionPoints(bot, actionCost(cardCatalogService.require(card.getCardId()))))
+                .findFirst()
+                .orElse(null);
+        if (firstCharacter == null) {
+            return false;
+        }
+        CardDefinition definition = cardCatalogService.require(firstCharacter.getCardId());
+        consumeActionPoints(bot, actionCost(definition));
+        bot.getHand().remove(firstCharacter);
+        firstCharacter.setSleeping(cardCatalogService.requireCard(definition.getId()).sleepsOnSummon());
+        bot.getBoard().add(firstCharacter);
+        bot.setSummonsThisTurn(bot.getSummonsThisTurn() + 1);
+        match.getLogs().add("瓦库消耗 " + actionCost(definition) + " 点行动点, 召唤了 " + definition.getName() + ".");
+        return true;
+    }
+
+    private boolean performBotSkill(MatchState match, PlayerState bot, PlayerState player) {
+        CardInstance firstSkill = bot.getHand().stream()
+                .filter(card -> cardCatalogService.require(card.getCardId()).getType() == CardType.SKILL)
+                .filter(card -> hasActionPoints(bot, actionCost(cardCatalogService.require(card.getCardId()))))
+                .filter(card -> canBotPrepareSkill(match, bot, player, card))
+                .findFirst()
+                .orElse(null);
+        if (firstSkill == null) {
+            return false;
+        }
+
+        CardDefinition definition = cardCatalogService.require(firstSkill.getCardId());
+        PlayEffectRequest request = new PlayEffectRequest();
+        request.setPlayerId("P2");
+        request.setHandInstanceId(firstSkill.getInstanceId());
+        assignBotSkillTarget(bot, player, definition, request);
+        consumeActionPoints(bot, actionCost(definition));
+        bot.getHand().remove(firstSkill);
+        if (skillResolverService.consumeSkillPrevention(player, match, definition)) {
+            match.getDiscardPile().add(firstSkill);
+            match.getLogs().add("瓦库消耗 " + actionCost(definition) + " 点行动点使用技能, " + player.getName() + " 抵御了 " + definition.getName() + ".");
+            return true;
+        }
+        skillResolverService.resolveEffect(match, bot, player, definition, request);
+        match.getDiscardPile().add(firstSkill);
+        match.getLogs().add("瓦库消耗 " + actionCost(definition) + " 点行动点, 使用了技能 " + definition.getName() + ".");
+        checkWinner(match);
+        return true;
     }
 
     private void discardDownToHandLimit(MatchState match, PlayerState player, List<String> discardInstanceIds, boolean automatic) {
@@ -576,9 +769,11 @@ public class GameService {
         if (!automatic && selectedIds.size() != overflow) {
             throw new IllegalStateException("手牌超过上限，请选择 " + overflow + " 张手牌弃置。");
         }
+        List<CardInstance> discardedCards = new ArrayList<>();
         if (automatic) {
             for (int index = 0; index < overflow; index += 1) {
                 CardInstance discarded = player.getHand().remove(player.getHand().size() - 1);
+                discardedCards.add(discarded);
                 match.getDiscardPile().add(discarded);
             }
         } else {
@@ -591,10 +786,20 @@ public class GameService {
             }
             for (String discardId : selectedIds) {
                 CardInstance discarded = matchSupportService.removeFromHand(player, discardId);
+                discardedCards.add(discarded);
                 match.getDiscardPile().add(discarded);
             }
         }
-        match.getLogs().add(player.getName() + " 回合结束弃置了 " + overflow + " 张手牌.");
+        match.getLogs().add(player.getName() + " 回合结束弃置了 " + overflow + " 张手牌: " + cardNames(discardedCards) + ".");
+    }
+
+    private String cardNames(List<CardInstance> cards) {
+        return cards.stream()
+                .map(battleService::cardName)
+                .toList()
+                .toString()
+                .replace("[", "")
+                .replace("]", "");
     }
 
     private int handSortRank(String cardId) {
