@@ -2,14 +2,15 @@ package zx.campusking.cards.skills;
 
 import zx.campusking.cards.BaseSkillCard;
 import zx.campusking.cards.CardEffectContext;
-import zx.campusking.model.EffectCategory;
-import zx.campusking.model.EffectType;
-import zx.campusking.model.SkillRange;
+import zx.campusking.model.CardDefinition;
 
 public final class ElfCard extends BaseSkillCard {
 
-    public ElfCard() {
-        super(90, "elf", "瓶中精灵", "使用后两回合内，如果有己方角色死亡，则其回复至体力上限的 1/5。", EffectType.REVIVE_ALLY, EffectCategory.DURATION, 5, 2, SkillRange.SELF);
+    public static final String ID = "elf";
+    public static final int ORDER = 90;
+
+    public ElfCard(CardDefinition definition) {
+        super(ORDER, definition);
     }
 
     @Override

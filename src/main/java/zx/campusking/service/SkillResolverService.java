@@ -7,6 +7,7 @@ import zx.campusking.cards.GameCard;
 import zx.campusking.model.CardDefinition;
 import zx.campusking.model.MatchState;
 import zx.campusking.model.PlayerState;
+import zx.campusking.model.PreventableAction;
 import zx.campusking.model.dto.PlayEffectRequest;
 
 /**
@@ -46,11 +47,11 @@ public class SkillResolverService {
      * 尝试消耗一层“下一张技能无效”的反制效果。
      * 反制牌本身不会被反制。
      */
-    public boolean consumeNegateSkill(PlayerState defender, MatchState match, CardDefinition definition) {
+    public boolean consumeSkillPrevention(PlayerState defender, MatchState match, CardDefinition definition) {
         if (cardCatalogService.requireCard(definition.getId()).bypassesNegate()) {
             return false;
         }
-        return statusEffectService.consumeNegateSkill(defender, match);
+        return statusEffectService.consumeActionPrevention(defender, match, PreventableAction.SKILL_CARD, definition.getName());
     }
 
     public boolean canResolveEffect(MatchState match, PlayerState player, PlayerState enemy, CardDefinition definition, PlayEffectRequest request) {

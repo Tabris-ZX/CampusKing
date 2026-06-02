@@ -5,6 +5,7 @@ import zx.campusking.cards.CardCombatContext;
 import zx.campusking.cards.CardDefeatContext;
 import zx.campusking.model.CardDefinition;
 import zx.campusking.model.CardInstance;
+import zx.campusking.model.CardRarity;
 import zx.campusking.model.MatchState;
 import zx.campusking.model.PlayerState;
 import zx.campusking.model.StatusEffectType;
@@ -64,7 +65,7 @@ public class BattleService {
             return;
         }
         target.setCurrentHealth(target.getCurrentHealth() - damage);
-        match.getLogs().add(cardName(source) + " 对 " + cardName(target) + " 造成了 " + damage + " 点伤害。");
+        match.getLogs().add(cardName(source) + " 对 " + cardName(target) + " 造成了 " + damage + " 点伤害.");
     }
 
     /**
@@ -72,6 +73,13 @@ public class BattleService {
      * 角色自身的死亡特性优先处理，然后再处理通用复活 Buff。
      */
     public void cleanupDefeated(MatchState match, PlayerState player) {
+        cleanupDefeated(match, player, null, null);
+    }
+
+    /**
+     * 清理被击败角色，并按被击败角色稀有度给奖励归属玩家发放奖励。
+     */
+    public void cleanupDefeated(MatchState match, PlayerState player, PlayerState rewardOwner, DeckService deckService) {
         List<CardInstance> defeated = player.getBoard().stream()
                 .filter(card -> card.getCurrentHealth() <= 0)
                 .toList();
@@ -89,13 +97,14 @@ public class BattleService {
                 int reviveHealth = Math.max(1, baseHealth(definition, card) / Math.max(1, reviveEffect.getValue()));
                 card.setCurrentHealth(reviveHealth);
                 card.setSleeping(true);
-                match.getLogs().add(definition.getName() + " 死亡后回复到 " + reviveHealth + " 点体力");
+                match.getLogs().add(definition.getName() + " 死亡后回复到 " + reviveHealth + " 点体力.");
                 continue;
             }
 
             player.getBoard().remove(card);
             match.getDiscardPile().add(card);
-            match.getLogs().add(definition.getName() + " 被击败");
+            match.getLogs().add(definition.getName() + " 被击败.");
+            grantDefeatReward(match, rewardOwner, definition, deckService);
         }
     }
 
@@ -118,5 +127,17 @@ public class BattleService {
             return definition.getSecondaryHealth();
         }
         return definition.getHealth() == null ? 0 : definition.getHealth();
+    }
+
+    private void grantDefeatReward(MatchState match, PlayerState rewardOwner, CardDefinition defeatedDefinition, DeckService deckService) {
+        if (rewardOwner == null || deckService == null || defeatedDefinition.getRarity() == null) {
+            return;
+        }
+        deckService.drawOne(match, rewardOwner);
+        match.getLogs().add(rewardOwner.getName() + " 击败角色, 摸了 1 张牌.");
+        if (defeatedDefinition.getRarity() == CardRarity.RARE) {
+            rewardOwner.setActionPoints(rewardOwner.getActionPoints() + 1);
+            match.getLogs().add(rewardOwner.getName() + " 击败稀有角色, 获得了 1 点行动点.");
+        }
     }
 }

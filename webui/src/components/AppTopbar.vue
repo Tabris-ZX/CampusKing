@@ -31,7 +31,27 @@
         </div>
         <button class="alt" type="button" @click="noticeOpen = false">关闭</button>
       </div>
-      <div class="topbar-dialog-body markdown-body" v-html="announcementHtml"></div>
+      <div class="topbar-notice-body">
+        <div v-if="noticeLoading" class="board-empty">正在加载公告...</div>
+        <article v-else-if="noticeError" class="markdown-body" v-html="noticeErrorHtml"></article>
+        <article v-else-if="!notices.length" class="markdown-body" v-html="emptyNoticeHtml"></article>
+        <div v-else class="topbar-docs-layout">
+          <aside class="topbar-doc-tabs" aria-label="公告列表">
+            <button
+              v-for="notice in notices"
+              :key="notice.name"
+              class="topbar-doc-tab"
+              :class="{ active: selectedNoticeName === notice.name }"
+              type="button"
+              @click="selectedNoticeName = notice.name"
+            >
+              <span>{{ notice.title }}</span>
+              <small>{{ notice.displayTime }}</small>
+            </button>
+          </aside>
+          <article class="topbar-dialog-body markdown-body topbar-doc-content" v-html="selectedNoticeHtml"></article>
+        </div>
+      </div>
     </section>
   </div>
 
@@ -91,7 +111,8 @@ import { RouterLink, useRoute, useRouter } from "vue-router";
 import designMarkdown from "../../../docs/design.md?raw";
 import howToAddMarkdown from "../../../docs/how-to-add.md?raw";
 import ruleMarkdown from "../../../docs/rule.md?raw";
-import { isAdminAuthenticated, loadAnnouncementMarkdown, markAdminAuthenticated, renderMarkdown, verifyAdminPassword } from "../lib/admin";
+import { isAdminAuthenticated, markAdminAuthenticated, renderMarkdown, verifyAdminPassword } from "../lib/admin";
+import { api } from "../lib/game";
 import { assetUrl, githubUrl } from "../lib/runtime-config";
 import { ensureSessionPlayerName, loadSession } from "../lib/session";
 import { showToast } from "../lib/toast";
@@ -123,8 +144,13 @@ const noticeOpen = ref(false);
 const docsOpen = ref(false);
 const adminAuthOpen = ref(false);
 const adminPassword = ref("");
-const announcementHtml = ref(renderMarkdown(loadAnnouncementMarkdown()));
 const selectedDocId = ref("rule");
+const notices = ref([]);
+const noticeLoading = ref(false);
+const noticeError = ref("");
+const selectedNoticeName = ref("");
+const emptyNoticeHtml = renderMarkdown("# 暂无公告\n\n请在 `resources/notices` 下添加 `yymmdd-hhmm.md` 公告文件。");
+const noticeErrorHtml = computed(() => renderMarkdown(`# 公告加载失败\n\n${noticeError.value || "请稍后重试。"}`));
 const docs = [
   {
     id: "rule",
@@ -147,6 +173,8 @@ const docs = [
 ];
 const selectedDoc = computed(() => docs.find(doc => doc.id === selectedDocId.value) || docs[0]);
 const selectedDocHtml = computed(() => renderMarkdown(selectedDoc.value.markdown));
+const selectedNotice = computed(() => notices.value.find(notice => notice.name === selectedNoticeName.value) || notices.value[0]);
+const selectedNoticeHtml = computed(() => selectedNotice.value?.html || "");
 const sessionPlayerName = computed(() => {
   const session = loadSession();
   return session?.playerName || ensureSessionPlayerName(session);
@@ -157,15 +185,15 @@ const visibleStatus = computed(() => {
   return status && status !== displayUser.value ? status : "";
 });
 
-watch(noticeOpen, open => {
-  if (open) {
-    announcementHtml.value = renderMarkdown(loadAnnouncementMarkdown());
-  }
-});
-
 watch(adminAuthOpen, open => {
   if (!open) {
     adminPassword.value = "";
+  }
+});
+
+watch(noticeOpen, open => {
+  if (open) {
+    loadNotices();
   }
 });
 
@@ -205,6 +233,32 @@ function submitAdminPassword() {
   adminAuthOpen.value = false;
   showToast("管理员验证通过", "success");
   router.push("/admin");
+}
+
+async function loadNotices() {
+  noticeLoading.value = true;
+  noticeError.value = "";
+  try {
+    const data = await api("/api/notices");
+    notices.value = data.map(notice => ({
+      ...notice,
+      title: noticeTitle(notice.markdown, notice.name),
+      html: renderMarkdown(notice.markdown || "")
+    }));
+    if (!notices.value.some(notice => notice.name === selectedNoticeName.value)) {
+      selectedNoticeName.value = notices.value[0]?.name || "";
+    }
+  } catch (error) {
+    noticeError.value = error.message;
+  } finally {
+    noticeLoading.value = false;
+  }
+}
+
+function noticeTitle(markdown, fallback) {
+  const firstHeading = (markdown || "").split(/\r?\n/).find(line => line.trim().startsWith("# "));
+  const title = firstHeading ? firstHeading.trim().replace(/^#\s+/, "").trim() : "";
+  return title || fallback || "未命名公告";
 }
 
 onMounted(() => {

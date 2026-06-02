@@ -20,10 +20,10 @@ export const SKILL_RANGE_TEXT = {
 };
 
 export const EFFECT_TYPE_TEXT = {
+  NONE: "无",
   GLOBAL_BUFF: "增益",
-  SHIELD: "护盾",
+  PREVENT_ACTION: "抵御",
   DAMAGE_ALL_ENEMIES: "伤害",
-  COUNTER_EFFECT: "反制",
   DRAW_AND_MODIFY_UNIT: "抽牌与单位改动",
   REVIVE_ALLY: "复活",
   DISCARD_AND_DRAW: "弃牌换牌",
@@ -33,4 +33,9 @@ export const EFFECT_TYPE_TEXT = {
 export const EFFECT_CATEGORY_TEXT = {
   INSTANT: "即时效果",
   DURATION: "持续效果"
+};
+
+export const RARITY_TEXT = {
+  COMMON: "普通",
+  RARE: "稀有"
 };

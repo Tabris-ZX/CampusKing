@@ -4,17 +4,18 @@ import zx.campusking.cards.BaseSkillCard;
 import zx.campusking.cards.CardEffectContext;
 import zx.campusking.model.CardDefinition;
 
-public final class ChipsCard extends BaseSkillCard {
+public final class ForesightCard extends BaseSkillCard {
 
-    public static final String ID = "chips";
-    public static final int ORDER = 120;
+    public static final String ID = "foresight";
+    public static final int ORDER = 65;
 
-    public ChipsCard(CardDefinition definition) {
+    public ForesightCard(CardDefinition definition) {
         super(ORDER, definition);
     }
 
     @Override
     public void resolveSkill(CardEffectContext context) {
-        context.discardAndDraw();
+        context.gainActionPoint();
+        context.damageSelf(5);
     }
 }

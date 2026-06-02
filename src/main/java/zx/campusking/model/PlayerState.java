@@ -19,7 +19,9 @@ public class PlayerState {
     /** 每名玩家的召唤区格子数。 */
     public static final int SUMMON_SLOTS = 3;
     /** 默认手牌上限。 */
-    public static final int HAND_LIMIT = 8;
+    public static final int HAND_LIMIT = 6;
+    /** 每回合默认行动点。 */
+    public static final int MAX_ACTION_POINTS = 3;
 
     /** 对局内玩家席位 id，例如 P1 / P2。 */
     private final String playerId;
@@ -31,6 +33,8 @@ public class PlayerState {
     private int hp = MAX_HP;
     /** 本回合已召唤次数。 */
     private int summonsThisTurn;
+    /** 当前回合剩余行动点。 */
+    private int actionPoints = MAX_ACTION_POINTS;
     /** 玩家身上的持续状态效果。 */
     private final List<StatusEffect> statusEffects = new ArrayList<>();
     /** 玩家当前手牌。 */

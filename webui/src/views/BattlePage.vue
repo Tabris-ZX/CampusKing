@@ -89,6 +89,8 @@
                         @dblclick="openDetail(slot.card)"
                       >
                         <div class="card-surface">
+                          <span class="card-cost-badge">{{ cardActionCost(slot.card.cardId) }}</span>
+                          <img v-if="cardRarityFrame(slot.card.cardId)" class="card-rarity-frame" :src="cardRarityFrame(slot.card.cardId)" alt="">
                           <div v-if="boardEffectBadges(slot.card).length" class="card-effect-stack">
                             <span
                               v-for="effect in boardEffectBadges(slot.card)"
@@ -115,8 +117,7 @@
                           <div class="card-overlay"></div>
                           <div class="card-body">
                             <div class="card-top">
-                              <div>
-                                <div class="card-kind">{{ describeType(cardDef(slot.card.cardId).type) }}</div>
+                              <div class="card-name-block">
                                 <div class="card-name">{{ cardDef(slot.card.cardId).name }}</div>
                               </div>
                             </div>
@@ -156,6 +157,8 @@
                         @dblclick="openDetail(slot.card)"
                       >
                         <div class="card-surface">
+                          <span class="card-cost-badge">{{ cardActionCost(slot.card.cardId) }}</span>
+                          <img v-if="cardRarityFrame(slot.card.cardId)" class="card-rarity-frame" :src="cardRarityFrame(slot.card.cardId)" alt="">
                           <div v-if="boardEffectBadges(slot.card).length" class="card-effect-stack">
                             <span
                               v-for="effect in boardEffectBadges(slot.card)"
@@ -182,8 +185,7 @@
                           <div class="card-overlay"></div>
                           <div class="card-body">
                             <div class="card-top">
-                              <div>
-                                <div class="card-kind">{{ describeType(cardDef(slot.card.cardId).type) }}</div>
+                              <div class="card-name-block">
                                 <div class="card-name">{{ cardDef(slot.card.cardId).name }}</div>
                               </div>
                             </div>
@@ -200,11 +202,20 @@
               </div>
 
               <aside class="battle-right-rail">
-                <div class="pile-box">墓地<br>{{ match.discardPile?.length || 0 }}</div>
-                <div class="pile-box draw-pile-box" :class="{ 'fx-draw-source': drawPulse }">
-                  <span>抽牌堆</span>
-                  <strong>{{ match.drawPile?.length || 0 }}</strong>
-                  <small>{{ topDrawPileName }}</small>
+                <div class="pile-box action-point-box">
+                  <span>行动点</span>
+                  <strong>{{ selfActionPoints }} / 3</strong>
+                </div>
+                <div class="pile-pair">
+                  <div class="pile-box compact-pile-box">
+                    <span>墓地</span>
+                    <strong>{{ match.discardPile?.length || 0 }}</strong>
+                  </div>
+                  <div class="pile-box compact-pile-box draw-pile-box" :class="{ 'fx-draw-source': drawPulse }">
+                    <span>抽牌堆</span>
+                    <strong>{{ match.drawPile?.length || 0 }}</strong>
+                    <small>{{ topDrawPileName }}</small>
+                  </div>
                 </div>
 
                 <section class="battle-log-panel">
@@ -218,7 +229,13 @@
                       :class="{ latest: highlightedLogKey === logKey(log, index) }"
                     >
                       <span class="log-index">{{ String(index + 1).padStart(2, "0") }}</span>
-                      <span class="log-text">{{ log }}</span>
+                      <span class="log-text">
+                        <span
+                          v-for="(part, partIndex) in logParts(log)"
+                          :key="`${logKey(log, index)}-${partIndex}`"
+                          :class="part.className"
+                        >{{ part.text }}</span>
+                      </span>
                     </div>
                   </div>
                 </section>
@@ -239,6 +256,8 @@
                     @dblclick="openDetail(card)"
                   >
                     <div class="card-surface">
+                      <span class="card-cost-badge">{{ cardActionCost(card.cardId) }}</span>
+                      <img v-if="cardRarityFrame(card.cardId)" class="card-rarity-frame" :src="cardRarityFrame(card.cardId)" alt="">
                       <div
                         class="card-figure"
                         :class="{ 'no-image': !cardImageFor(card.cardId) }"
@@ -254,15 +273,14 @@
                       <div class="card-overlay"></div>
                       <div class="card-body">
                         <div class="card-top">
-                          <div>
-                            <div class="card-kind">{{ describeType(cardDef(card.cardId).type) }}</div>
+                          <div class="card-name-block">
                             <div class="card-name">{{ cardDef(card.cardId).name }}</div>
                           </div>
                         </div>
                         <div class="mini-stats">
                           <template v-if="cardDef(card.cardId).type === 'CHARACTER'">
                             <span>攻 {{ describeAttack(cardDef(card.cardId)) }}</span>
-                            <span>体 {{ cardDef(card.cardId).secondaryHealth != null ? `${cardDef(card.cardId).health || 0}/${cardDef(card.cardId).secondaryHealth}` : (cardDef(card.cardId).health || 0) }}</span>
+                            <span>体 {{ cardDef(card.cardId).exclusive?.secondaryHealth != null ? `${cardDef(card.cardId).health || 0}/${cardDef(card.cardId).exclusive.secondaryHealth}` : (cardDef(card.cardId).health || 0) }}</span>
                           </template>
                           <template v-else>
                             <span>{{ describeSkillRange(cardDef(card.cardId).skillRange) }}</span>
@@ -293,14 +311,15 @@
     <div v-if="detailCard" class="detail-card">
       <button class="detail-close alt" type="button" @click="detailCard = null">关闭</button>
       <div class="card-surface">
+        <span class="card-cost-badge">{{ detailActionCost }}</span>
+        <img v-if="detailRarityFrame" class="card-rarity-frame" :src="detailRarityFrame" alt="">
         <div class="card-figure" :class="{ 'no-image': !detailImage }" :data-mark="detailMark">
           <img v-if="detailImage" :src="detailImage" :alt="detailDefinition.name" @error="handleImageError($event, detailCard?.cardId || detailCard?.id)">
         </div>
         <div class="card-overlay"></div>
         <div class="card-body">
           <div class="card-top">
-            <div>
-              <div class="card-kind">{{ describeType(detailDefinition.type) }}</div>
+            <div class="card-name-block">
               <div class="card-name">{{ detailDefinition.name }}</div>
             </div>
           </div>
@@ -308,10 +327,14 @@
             <template v-if="detailDefinition.type === 'CHARACTER'">
               <span class="stat">攻击 {{ describeAttack(detailDefinition, detailCard?.formIndex || 0) }}</span>
               <span class="stat">体力 {{ detailCurrentHealth }}</span>
+              <span class="stat">行动点 {{ detailActionCost }}</span>
+              <span class="stat">稀有度 {{ describeRarity(detailDefinition.rarity) }}</span>
             </template>
             <template v-else>
               <span class="stat">作用范围 {{ describeSkillRange(detailDefinition.skillRange) }}</span>
               <span class="stat">效果分类 {{ describeEffectCategory(detailDefinition.effectCategory) }}</span>
+              <span class="stat">行动点 {{ detailActionCost }}</span>
+              <span class="stat">稀有度 {{ describeRarity(detailDefinition.rarity) }}</span>
             </template>
           </div>
           <div class="card-text">{{ detailDefinition.description || "暂无描述" }}</div>
@@ -329,7 +352,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import AppTopbar from "../components/AppTopbar.vue";
-import { api, buildInviteLink, cardImage, describeAttack, describeEffect, describeEffectCategory, describeEffectType, describeSkillRange, describeType, getInviteBlockedReason, isMissingRoomError, swapCardImageToFallback } from "../lib/game";
+import { actionCostOf, api, buildInviteLink, cardImage, describeAttack, describeEffect, describeEffectCategory, describeEffectType, describeRarity, describeSkillRange, getInviteBlockedReason, isMissingRoomError, swapCardImageToFallback } from "../lib/game";
 import { assetRoot, copyText, publicBaseUrl, wsGamePath, wsRoot } from "../lib/runtime-config";
 import { clearSession, ensureSessionPlayerName, loadSession, saveSession } from "../lib/session";
 import { showToast } from "../lib/toast";
@@ -403,14 +426,15 @@ const emptyStateText = computed(() => {
 });
 
 const canSacrifice = computed(() => {
-  return !!match.value && match.value.ready && isMyTurn.value && match.value.phase === "ACTION" && !!selfPlayer.value?.board?.length;
+  return !!match.value && match.value.ready && isMyTurn.value && match.value.phase === "ACTION" && !!selfPlayer.value?.board?.length && hasActionPoints(1);
 });
 
 const canSortHand = computed(() => {
   return !!match.value && match.value.ready && !!selfPlayer.value && (selfPlayer.value.hand?.length || 0) > 1;
 });
 
-const discardOverflow = computed(() => Math.max(0, (selfPlayer.value?.hand?.length || 0) - 8));
+const discardOverflow = computed(() => Math.max(0, (selfPlayer.value?.hand?.length || 0) - 6));
+const selfActionPoints = computed(() => selfPlayer.value?.actionPoints ?? 0);
 
 const canConfirmSelectedHand = computed(() => {
   const my = selfPlayer.value;
@@ -422,6 +446,9 @@ const canConfirmSelectedHand = computed(() => {
     return false;
   }
   const definition = cardDef(selectedCard.cardId);
+  if (!hasActionPoints(cardActionCost(selectedCard.cardId))) {
+    return false;
+  }
   if (definition.type === "CHARACTER") {
     return my.board.length < 3 && my.summonsThisTurn < 1;
   }
@@ -456,14 +483,14 @@ const modeText = computed(() => {
     const selectedCard = my.hand.find(card => card.instanceId === pendingSkillTarget.value.instanceId);
     const definition = selectedCard ? cardDef(selectedCard.cardId) : null;
     return definition
-      ? `请为 ${definition.name} 选择一个角色或玩家目标。`
-      : "请为当前技能选择一个角色或玩家目标。";
+      ? `请为 ${definition.name} 选择一个场上角色目标。`
+      : "请为当前技能选择一个场上角色目标。";
   }
   if (discardMode.value) {
     return `请选择 ${discardOverflow.value} 张手牌弃置，已选择 ${discardSelectionIds.value.length} 张。`;
   }
   if (sacrificeMode.value) {
-    return "请选择己方召唤区一名角色献祭。";
+    return `请选择己方召唤区一名角色献祭，将消耗 1 点行动点。当前剩余 ${selfActionPoints.value} 点。`;
   }
   if (selectedAttackerId.value) {
     const attacker = my.board.find(card => card.instanceId === selectedAttackerId.value);
@@ -473,9 +500,9 @@ const modeText = computed(() => {
   if (selectedHandId.value) {
     const selectedCard = my.hand.find(card => card.instanceId === selectedHandId.value);
     const definition = selectedCard ? cardDef(selectedCard.cardId) : null;
-    return definition ? `已选择 ${definition.name}。点击“确定”使用。` : "已选择一张手牌。";
+    return definition ? `已选择 ${definition.name}，消耗 ${cardActionCost(selectedCard.cardId)} 点行动点。点击“确定”使用。` : "已选择一张手牌。";
   }
-  return isMyTurn.value ? "可选择手牌出牌，或选择场上可攻击角色。" : "当前不是你的回合，等待对方操作。";
+  return isMyTurn.value ? `可选择手牌出牌，或选择场上可攻击角色。当前剩余 ${selfActionPoints.value} 点行动点。` : "当前不是你的回合，等待对方操作。";
 });
 
 const enemySlots = computed(() => {
@@ -550,9 +577,23 @@ const detailImage = computed(() => {
 
 const detailMark = computed(() => (detailDefinition.value.type === "SKILL" ? "技" : "角"));
 const detailCurrentHealth = computed(() => detailCard.value?.currentHealth || detailDefinition.value.health || 0);
+const detailActionCost = computed(() => cardActionCost(detailCard.value?.cardId || detailCard.value?.id));
+const detailRarityFrame = computed(() => cardRarityFrame(detailCard.value?.cardId || detailCard.value?.id));
 
 function cardDef(cardId) {
   return cardsMap.value[cardId] || { id: cardId, name: cardId, description: "", type: "UNKNOWN" };
+}
+
+function cardActionCost(cardId) {
+  return actionCostOf(cardDef(cardId));
+}
+
+function hasActionPoints(cost) {
+  return selfActionPoints.value >= cost;
+}
+
+function cardRarityFrame(cardId) {
+  return "";
 }
 
 function cardImageFor(cardId) {
@@ -587,40 +628,40 @@ function boardEffectBadges(card) {
 
 function describeShortEffect(effect) {
   const valueSuffix = effect.value ? `+${effect.value}` : "";
+  const stackSuffix = effect.stacks > 1 ? `x${effect.stacks}` : "";
+  const turnSuffix = effect.remainingTurns != null ? `·${effect.remainingTurns}` : "";
   switch (effect.type) {
     case "ATTACK_UP":
-      return `攻${valueSuffix}`;
+      return `攻${valueSuffix}${stackSuffix}${turnSuffix}`;
     case "MAX_HP_UP":
-      return `体${valueSuffix}`;
+      return `体${valueSuffix}${stackSuffix}${turnSuffix}`;
     case "TURN_HEAL":
-      return `回${valueSuffix}`;
-    case "SHIELD":
-      return "盾";
-    case "NEGATE_NEXT_SKILL":
-      return "反";
+      return `回${valueSuffix}${stackSuffix}${turnSuffix}`;
+    case "PREVENT_NEXT_ACTION":
+      return `御${stackSuffix}${turnSuffix}`;
     case "REVIVE_ON_DEATH":
-      return "复";
+      return `复${stackSuffix}${turnSuffix}`;
     default:
-      return effect.category === "debuff" ? "弱" : "强";
+      return `${effect.category === "debuff" ? "弱" : "强"}${stackSuffix}${turnSuffix}`;
   }
 }
 
 function sumCardEffect(card, type) {
   return (card?.statusEffects || [])
     .filter(effect => effect.type === type)
-    .reduce((total, effect) => total + (Number(effect.value) || 0), 0);
+    .reduce((total, effect) => total + (Number(effect.value) || 0) * Math.max(1, Number(effect.stacks) || 1), 0);
 }
 
 function currentFormAttack(definition, formIndex = 0) {
-  if (formIndex > 0 && definition.secondaryAttack != null) {
-    return Number(definition.secondaryAttack) || 0;
+  if (formIndex > 0 && definition.exclusive?.secondaryAttack != null) {
+    return Number(definition.exclusive.secondaryAttack) || 0;
   }
   return Number(definition.attack) || 0;
 }
 
 function currentFormHealth(definition, formIndex = 0) {
-  if (formIndex > 0 && definition.secondaryHealth != null) {
-    return Number(definition.secondaryHealth) || 0;
+  if (formIndex > 0 && definition.exclusive?.secondaryHealth != null) {
+    return Number(definition.exclusive.secondaryHealth) || 0;
   }
   return Number(definition.health) || 0;
 }
@@ -639,6 +680,68 @@ function boardHealth(card) {
 
 function logKey(log, index) {
   return `${index}-${log}`;
+}
+
+function normalizePunctuation(value) {
+  return String(value ?? "")
+    .replace(/，/g, ", ")
+    .replace(/。/g, ".")
+    .replace(/；/g, "; ")
+    .replace(/：/g, ": ")
+    .replace(/！/g, "!")
+    .replace(/？/g, "?")
+    .replace(/（/g, "(")
+    .replace(/）/g, ")")
+    .replace(/\s+([,.;:!?])/g, "$1")
+    .replace(/([,.;:!?])(?!\s|$)/g, "$1 ");
+}
+
+function logHighlightTokens() {
+  const tokens = [];
+  const seen = new Set();
+  const add = (text, className) => {
+    const normalized = String(text || "").trim();
+    if (!normalized || seen.has(normalized)) {
+      return;
+    }
+    seen.add(normalized);
+    tokens.push({ text: normalized, className });
+  };
+  add(selfPlayer.value?.name, "log-mark-self");
+  add("我方", "log-mark-self");
+  add("己方", "log-mark-self");
+  add(opponentPlayer.value?.name, "log-mark-enemy");
+  add("对方", "log-mark-enemy");
+  add("敌方", "log-mark-enemy");
+  add("对手", "log-mark-enemy");
+  return tokens.sort((left, right) => right.text.length - left.text.length);
+}
+
+function logParts(log) {
+  const text = normalizePunctuation(log);
+  const tokens = logHighlightTokens();
+  if (!tokens.length || !text) {
+    return [{ text, className: "" }];
+  }
+  const parts = [];
+  let index = 0;
+  while (index < text.length) {
+    const token = tokens.find(item => text.startsWith(item.text, index));
+    if (token) {
+      parts.push({ text: token.text, className: token.className });
+      index += token.text.length;
+      continue;
+    }
+    const nextIndex = index + 1;
+    const lastPart = parts[parts.length - 1];
+    if (lastPart && !lastPart.className) {
+      lastPart.text += text.slice(index, nextIndex);
+    } else {
+      parts.push({ text: text.slice(index, nextIndex), className: "" });
+    }
+    index = nextIndex;
+  }
+  return parts;
 }
 
 function queueEffectReset(callback, delay = 900) {
@@ -1067,7 +1170,11 @@ async function playSkill(instanceId, targetPlayerId = null, targetInstanceId = n
     const definition = skillCard ? cardDef(skillCard.cardId) : null;
     if (definition?.skillRange === "SINGLE" && !targetPlayerId) {
       pendingSkillTarget.value = { instanceId };
-      showToast("请选择一个角色或玩家作为技能目标。", "info");
+      showToast("请选择一个场上角色作为技能目标。", "info");
+      return;
+    }
+    if (definition?.skillRange === "SINGLE" && targetPlayerId && !targetInstanceId) {
+      showToast("这个技能只能选择场上角色，不能选择玩家。", "error");
       return;
     }
     match.value = await api(`/api/matches/${match.value.matchId}/play-skill`, {

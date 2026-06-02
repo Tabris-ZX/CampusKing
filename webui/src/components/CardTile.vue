@@ -2,26 +2,10 @@
   <article class="catalog-card panel" :class="cardTypeClass" @dblclick="$emit('preview', card)">
     <div class="catalog-art" :class="{ 'no-image': imageFailed || !image }">
       <img v-if="image && !imageFailed" :src="image" :alt="card.name" @error="handleImageError">
-    </div>
-    <div class="catalog-info">
-      <div class="catalog-head">
-        <div>
-          <span class="catalog-type">{{ describeType(card.type) }}</span>
-          <h2>{{ card.name }}</h2>
-        </div>
-        <div class="catalog-id">{{ card.id }}</div>
-      </div>
-      <p>{{ card.description || "暂无描述" }}</p>
-      <div class="catalog-stats">
-        <template v-if="card.type === 'CHARACTER'">
-          <span>攻击 {{ describeAttack(card) }}</span>
-          <span>体力 {{ card.secondaryHealth != null ? `${card.health || 0}/${card.secondaryHealth}` : (card.health || 0) }}</span>
-        </template>
-        <template v-else>
-          <span>范围 {{ describeSkillRange(card.skillRange) }}</span>
-          <span>效果 {{ describeEffectType(card.effectType) }}</span>
-          <span>分类 {{ describeEffectCategory(card.effectCategory) }}</span>
-        </template>
+      <span class="card-cost-badge">{{ cardActionCost }}</span>
+      <img v-if="rarityFrame" class="card-rarity-frame" :src="rarityFrame" alt="">
+      <div class="catalog-card-caption">
+        <h2>{{ card.name }}</h2>
       </div>
     </div>
   </article>
@@ -29,7 +13,7 @@
 
 <script setup>
 import { computed, ref } from "vue";
-import { cardImage, describeAttack, describeEffectCategory, describeEffectType, describeSkillRange, describeType, swapCardImageToFallback } from "../lib/game";
+import { actionCostOf, cardImage, swapCardImageToFallback } from "../lib/game";
 
 const props = defineProps({
   card: {
@@ -46,6 +30,10 @@ defineEmits(["preview"]);
 
 const imageFailed = ref(false);
 const image = computed(() => cardImage(props.card, {}, props.assetBaseUrl));
+const cardActionCost = computed(() => actionCostOf(props.card));
+const rarityFrame = computed(() => {
+  return "";
+});
 const cardTypeClass = computed(() => ({
   "catalog-card-character": props.card.type === "CHARACTER",
   "catalog-card-skill": props.card.type === "SKILL"

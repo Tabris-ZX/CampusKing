@@ -5,6 +5,7 @@ import zx.campusking.model.CardDefinition;
 import zx.campusking.model.CardInstance;
 import zx.campusking.model.MatchState;
 import zx.campusking.model.PlayerState;
+import zx.campusking.model.PreventableAction;
 import zx.campusking.model.StatusEffect;
 import zx.campusking.model.StatusEffectType;
 
@@ -35,7 +36,7 @@ public class StatusEffectService {
             healed = true;
         }
         if (healed) {
-            match.getLogs().add(player.getName() + " 触发了回合开始回血效果。");
+            match.getLogs().add(player.getName() + " 触发了回合开始回血效果.");
         }
     }
 
@@ -54,11 +55,11 @@ public class StatusEffectService {
             }
             removeExpiredEffects(card);
         }
-        match.getLogs().add(player.getName() + " 刷新了持续效果回合数");
+        match.getLogs().add(player.getName() + " 刷新了持续效果回合数.");
     }
 
     public void applyOrRefreshEffect(PlayerState player, StatusEffect incoming) {
-        StatusEffect existing = findFirstEffect(player, incoming.getType());
+        StatusEffect existing = findMergeTarget(player, incoming);
         if (existing == null) {
             player.getStatusEffects().add(incoming);
             return;
@@ -104,14 +105,14 @@ public class StatusEffectService {
     public int sumEffectValue(PlayerState player, StatusEffectType type) {
         return player.getStatusEffects().stream()
                 .filter(effect -> effect.getType() == type)
-                .mapToInt(StatusEffect::getValue)
+                .mapToInt(this::stackedValue)
                 .sum();
     }
 
     public int sumEffectValue(CardInstance card, StatusEffectType type) {
         return card.getStatusEffects().stream()
                 .filter(effect -> effect.getType() == type)
-                .mapToInt(StatusEffect::getValue)
+                .mapToInt(this::stackedValue)
                 .sum();
     }
 
@@ -133,25 +134,22 @@ public class StatusEffectService {
                 + sumEffectValue(card, StatusEffectType.MAX_HP_UP);
     }
 
-    public boolean consumeShield(PlayerState player, MatchState match, String targetName) {
-        StatusEffect shield = findFirstEffect(player, StatusEffectType.SHIELD);
-        if (shield == null) {
-            return false;
-        }
-        shield.setStacks(Math.max(0, shield.getStacks() - 1));
-        removeExpiredEffects(player);
-        match.getLogs().add("护盾替 " + targetName + " 挡下了这次伤害。");
-        return true;
+    public void applyPreventNextAction(PlayerState player, StatusEffect incoming) {
+        applyOrRefreshEffect(player, incoming);
     }
 
-    public boolean consumeNegateSkill(PlayerState player, MatchState match) {
-        StatusEffect negate = findFirstEffect(player, StatusEffectType.NEGATE_NEXT_SKILL);
-        if (negate == null) {
+    public boolean consumeActionPrevention(PlayerState player, MatchState match, PreventableAction action, String actionName) {
+        StatusEffect prevention = player.getStatusEffects().stream()
+                .filter(effect -> effect.getType() == StatusEffectType.PREVENT_NEXT_ACTION)
+                .filter(effect -> effect.getValue() == action.ordinal())
+                .findFirst()
+                .orElse(null);
+        if (prevention == null) {
             return false;
         }
-        negate.setStacks(Math.max(0, negate.getStacks() - 1));
+        prevention.setStacks(Math.max(0, prevention.getStacks() - 1));
         removeExpiredEffects(player);
-        match.getLogs().add(player.getName() + " 消耗了一层技能反制效果。");
+        match.getLogs().add(player.getName() + " 抵御了 " + actionName + ".");
         return true;
     }
 
@@ -162,7 +160,7 @@ public class StatusEffectService {
         }
         revive.setStacks(Math.max(0, revive.getStacks() - 1));
         removeExpiredEffects(player);
-        match.getLogs().add(player.getName() + " 消耗了一层死亡复活效果。");
+        match.getLogs().add(player.getName() + " 消耗了一层死亡复活效果.");
         return revive;
     }
 
@@ -176,5 +174,17 @@ public class StatusEffectService {
         card.getStatusEffects().removeIf(effect ->
                 (effect.getRemainingTurns() != null && effect.getRemainingTurns() <= 0)
                         || effect.getStacks() <= 0);
+    }
+
+    private StatusEffect findMergeTarget(PlayerState player, StatusEffect incoming) {
+        return player.getStatusEffects().stream()
+                .filter(effect -> effect.getType() == incoming.getType())
+                .filter(effect -> incoming.getType() != StatusEffectType.PREVENT_NEXT_ACTION || effect.getValue() == incoming.getValue())
+                .findFirst()
+                .orElse(null);
+    }
+
+    private int stackedValue(StatusEffect effect) {
+        return effect.getValue() * Math.max(1, effect.getStacks());
     }
 }

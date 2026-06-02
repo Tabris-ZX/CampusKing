@@ -20,11 +20,18 @@ import zx.campusking.model.dto.LeaveRoomRequest;
 import zx.campusking.model.dto.PlayEffectRequest;
 import zx.campusking.model.dto.RestoreSessionResponse;
 import zx.campusking.model.dto.SacrificeRequest;
+import zx.campusking.model.dto.NoticeResponse;
+import zx.campusking.model.dto.SaveNoticeRequest;
+import zx.campusking.model.dto.SaveCardsRequest;
 import zx.campusking.model.dto.SummonRequest;
 import zx.campusking.model.MatchState;
+import zx.campusking.model.CardDefinition;
 import zx.campusking.service.CardCatalogService;
 import zx.campusking.service.GameService;
+import zx.campusking.service.NoticeService;
 
+import java.io.UncheckedIOException;
+import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
@@ -39,11 +46,18 @@ public class GameController {
     private final GameService gameService;
     private final CardCatalogService cardCatalogService;
     private final AssetProperties assetProperties;
+    private final NoticeService noticeService;
 
-    public GameController(GameService gameService, CardCatalogService cardCatalogService, AssetProperties assetProperties) {
+    public GameController(
+            GameService gameService,
+            CardCatalogService cardCatalogService,
+            AssetProperties assetProperties,
+            NoticeService noticeService
+    ) {
         this.gameService = gameService;
         this.cardCatalogService = cardCatalogService;
         this.assetProperties = assetProperties;
+        this.noticeService = noticeService;
     }
 
     /**
@@ -52,8 +66,16 @@ public class GameController {
      * @return 卡牌定义列表
      */
     @GetMapping("/cards")
-    public Object listCards() {
+    public List<CardDefinition> listCards() {
         return cardCatalogService.listAll();
+    }
+
+    /**
+     * 保存卡牌注册表参数。
+     */
+    @PostMapping("/cards")
+    public List<CardDefinition> saveCards(@RequestBody SaveCardsRequest request) {
+        return cardCatalogService.saveRegistry(request == null ? List.of() : request.getCards());
     }
 
     /**
@@ -67,6 +89,22 @@ public class GameController {
                 "baseUrl", assetProperties.getPublicBaseUrl(),
                 "assetBaseUrl", assetProperties.getBaseUrl()
         );
+    }
+
+    /**
+     * 获取公告列表，按公告文件名时间倒序返回。
+     */
+    @GetMapping("/notices")
+    public List<NoticeResponse> notices() {
+        return noticeService.listNotices();
+    }
+
+    /**
+     * 保存一条公告到 resources/notices。
+     */
+    @PostMapping("/notices")
+    public NoticeResponse saveNotice(@RequestBody SaveNoticeRequest request) {
+        return noticeService.saveNotice(request);
     }
 
     /**
@@ -261,6 +299,15 @@ public class GameController {
     @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Map<String, String> handleBadRequest(RuntimeException exception) {
+        return Map.of("error", exception.getMessage());
+    }
+
+    /**
+     * 将公告文件读写错误转换为 500。
+     */
+    @ExceptionHandler(UncheckedIOException.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public Map<String, String> handleFileError(UncheckedIOException exception) {
         return Map.of("error", exception.getMessage());
     }
 }

@@ -1,14 +1,14 @@
 :root {
-  --bg-top: #f3f8f4;
-  --bg-bottom: #dce9ea;
-  --panel: rgba(250, 253, 251, 0.9);
+  --bg-top: #f4f8ff;
+  --bg-bottom: #dfeeff;
+  --panel: rgba(250, 253, 255, 0.9);
   --panel-strong: rgba(255, 255, 255, 0.96);
-  --ink: #17313a;
-  --muted: #60767c;
-  --line: rgba(48, 78, 86, 0.14);
-  --accent: #2f8f8a;
-  --accent-dark: #226f70;
-  --good: #2d8f73;
+  --ink: #17304f;
+  --muted: #64758f;
+  --line: rgba(46, 83, 132, 0.14);
+  --accent: #4f86d9;
+  --accent-dark: #2f5f9f;
+  --good: #3f78be;
   --danger: #d65a71;
   --shadow: 0 16px 34px rgba(32, 60, 68, 0.11);
   --shadow-soft: 0 8px 22px rgba(32, 60, 68, 0.08);
@@ -16,9 +16,9 @@
   --radius-md: 12px;
   --radius-sm: 8px;
   --page-width: min(1680px, calc(100vw - 36px));
-  --surface-gradient: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(246, 250, 248, 0.88));
-  --hp-bg: rgba(47, 143, 138, 0.12);
-  --hp-fill: linear-gradient(90deg, #67c1ae, #2f8f8a);
+  --surface-gradient: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(246, 250, 255, 0.88));
+  --hp-bg: rgba(79, 134, 217, 0.12);
+  --hp-fill: linear-gradient(90deg, #8fb8f6, #4f86d9);
 }
 
 * {
@@ -36,8 +36,8 @@ body {
   scrollbar-gutter: stable both-edges;
   color: var(--ink);
   background:
-    linear-gradient(135deg, rgba(47, 143, 138, 0.1), transparent 28%),
-    linear-gradient(225deg, rgba(185, 127, 75, 0.1), transparent 28%),
+    linear-gradient(135deg, rgba(79, 134, 217, 0.1), transparent 28%),
+    linear-gradient(225deg, rgba(143, 184, 246, 0.14), transparent 28%),
     linear-gradient(180deg, var(--bg-top), var(--bg-bottom));
 }
 
@@ -80,7 +80,7 @@ a {
   background:
     linear-gradient(180deg, rgba(17, 28, 42, 0.12), rgba(17, 28, 42, 0.34)),
     var(--topbar-image, none) center center / cover no-repeat,
-    linear-gradient(135deg, #9ac7bd 0%, #6faebd 46%, #86ad61 100%);
+    linear-gradient(135deg, #a8c8f5 0%, #80b4ea 46%, #b2caee 100%);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.22),
     0 14px 32px rgba(30, 49, 72, 0.14);
@@ -211,8 +211,8 @@ input {
 
 input:focus,
 textarea:focus {
-  border-color: rgba(47, 143, 138, 0.42);
-  box-shadow: 0 0 0 3px rgba(47, 143, 138, 0.12);
+  border-color: rgba(79, 134, 217, 0.42);
+  box-shadow: 0 0 0 3px rgba(79, 134, 217, 0.12);
   outline: none;
 }
 
@@ -243,7 +243,7 @@ button {
 button:hover {
   transform: translateY(-1px);
   background: var(--accent-dark);
-  box-shadow: 0 12px 24px rgba(47, 143, 138, 0.18);
+  box-shadow: 0 12px 24px rgba(79, 134, 217, 0.18);
 }
 
 button.alt {
@@ -310,7 +310,7 @@ button.alt:hover {
   justify-content: center;
   border-radius: 999px;
   padding: 5px 10px;
-  background: rgba(47, 143, 138, 0.12);
+  background: rgba(79, 134, 217, 0.12);
   color: var(--accent-dark);
   font-size: 12px;
   font-weight: 800;
@@ -388,7 +388,20 @@ button.alt:hover {
 
 .admin-hero-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
+  justify-content: flex-end;
+}
+
+.admin-hero-actions button {
+  min-width: 108px;
+}
+
+.admin-hero-actions button.active {
+  background: #4f86d9;
+  color: #fff;
+  border-color: rgba(79, 134, 217, 0.72);
+  box-shadow: 0 12px 22px rgba(79, 134, 217, 0.2);
 }
 
 .admin-grid {
@@ -457,7 +470,7 @@ button.alt:hover {
 }
 
 .admin-user-state.online {
-  background: rgba(45, 143, 115, 0.14);
+  background: rgba(63, 120, 190, 0.14);
   color: var(--good);
 }
 
@@ -494,6 +507,115 @@ button.alt:hover {
   gap: 6px;
 }
 
+.admin-empty {
+  padding: 18px;
+  border-radius: var(--radius-md);
+  background: rgba(255,255,255,0.72);
+  color: var(--muted);
+}
+
+.admin-card-editor {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.admin-card-list {
+  display: grid;
+  gap: 8px;
+  max-height: 720px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.admin-card-tab {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid rgba(56, 102, 154, 0.12);
+  background: rgba(255,255,255,0.76);
+  color: var(--ink);
+  box-shadow: none;
+}
+
+.admin-card-tab.active {
+  border-color: rgba(79, 134, 217, 0.46);
+  background: rgba(79, 134, 217, 0.14);
+}
+
+.admin-card-tab span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.admin-card-form {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-card-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 14px;
+  border-top: 1px solid rgba(56, 102, 154, 0.12);
+}
+
+.admin-card-form-actions button {
+  min-width: 180px;
+}
+
+.admin-card-form-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(56, 102, 154, 0.12);
+}
+
+.admin-card-form-head h3 {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.1;
+}
+
+.admin-card-fields select,
+.admin-wide-field select {
+  width: 100%;
+  min-height: 42px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(56, 102, 154, 0.18);
+  padding: 9px 12px;
+  background: rgba(255,255,255,0.9);
+  color: var(--ink);
+  font: inherit;
+}
+
+.admin-wide-field {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-small-textarea {
+  width: 100%;
+  min-height: 96px;
+  resize: vertical;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  padding: 12px;
+  background: rgba(255,255,255,0.96);
+  color: var(--ink);
+  font: inherit;
+}
+
+.admin-tuner-section {
+  display: grid;
+  gap: 14px;
+}
+
 @media (max-width: 1080px) {
   .topbar {
     min-height: 142px;
@@ -520,6 +642,10 @@ button.alt:hover {
 
   .admin-card-fields {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-card-editor {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -655,6 +781,11 @@ button.disabled:hover {
   line-height: 1.7;
 }
 
+.topbar-notice-body {
+  min-height: min(58vh, 620px);
+}
+
+.topbar-announcement-dialog,
 .topbar-docs-dialog {
   width: min(1040px, calc(100vw - 32px));
 }
@@ -689,9 +820,9 @@ button.disabled:hover {
 
 .topbar-doc-tab:hover,
 .topbar-doc-tab.active {
-  background: linear-gradient(135deg, rgba(47, 143, 138, 0.18), rgba(255,255,255,0.9));
+  background: linear-gradient(135deg, rgba(79, 134, 217, 0.18), rgba(255,255,255,0.9));
   color: var(--accent-dark);
-  border-color: rgba(47, 143, 138, 0.28);
+  border-color: rgba(79, 134, 217, 0.28);
 }
 
 .topbar-doc-tab span {

@@ -11,10 +11,8 @@ public enum StatusEffectType {
     MAX_HP_UP,
     /** 回合开始回血。 */
     TURN_HEAL,
-    /** 抵挡一次伤害。 */
-    SHIELD,
-    /** 使对方下一张技能无效。 */
-    NEGATE_NEXT_SKILL,
+    /** 抵御下一次指定动作。 */
+    PREVENT_NEXT_ACTION,
     /** 角色死亡后回复一定生命。 */
     REVIVE_ON_DEATH
 }

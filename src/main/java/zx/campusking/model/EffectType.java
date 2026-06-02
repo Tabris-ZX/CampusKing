@@ -11,10 +11,8 @@ public enum EffectType {
     DAMAGE_ALL_ENEMIES,
     /** 全局持续增益。 */
     GLOBAL_BUFF,
-    /** 护盾效果。 */
-    SHIELD,
-    /** 反制下一张技能。 */
-    COUNTER_EFFECT,
+    /** 抵御指定动作。 */
+    PREVENT_ACTION,
     /** 抽牌并修改场上角色生命。 */
     DRAW_AND_MODIFY_UNIT,
     /** 死亡后复活类效果。 */

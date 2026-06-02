@@ -99,3 +99,11 @@ resources/images/texture/skills/soda.png
 ### 新增卡牌
 
 [指南](https://github.com/Tabris-ZX/CampusKing/blob/master/docs/how-to-add.md)
+
+
+<div align="center">
+
+## 🌟 如果这个项目对你有帮助，请给个 Star！
+
+**有任何问题欢迎来提issue/pr!**
+</div>

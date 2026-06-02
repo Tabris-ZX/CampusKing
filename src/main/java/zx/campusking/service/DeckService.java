@@ -51,7 +51,7 @@ public class DeckService {
         Collections.shuffle(match.getDiscardPile());
         match.getDrawPile().addAll(match.getDiscardPile());
         match.getDiscardPile().clear();
-        match.getLogs().add("墓地已洗回抽牌堆。");
+        match.getLogs().add("墓地已洗回抽牌堆.");
     }
 
     private int defaultHealth(CardDefinition definition) {

@@ -1,7 +1,13 @@
 package zx.campusking.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonSetter;
 import lombok.Getter;
 import lombok.Setter;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * 卡牌静态定义。
@@ -9,6 +15,7 @@ import lombok.Setter;
  */
 @Setter
 @Getter
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class CardDefinition {
 
     /** 卡牌唯一 id，同时用于贴图路径和对局实例关联。 */
@@ -19,16 +26,14 @@ public class CardDefinition {
     private CardType type;
     /** 卡牌规则描述。 */
     private String description;
-    /** 角色基础攻击力，技能牌通常为 0。 */
+    /** 使用或召唤该卡牌消耗的行动点。 */
+    private Integer actionCost;
+    /** 卡牌稀有度。 */
+    private CardRarity rarity;
+    /** 角色基础攻击力。 */
     private Integer attack;
-    /** 前端展示用攻击文本，例如“+∞”或“20/50”。 */
-    private String attackText;
-    /** 角色基础生命值，技能牌通常为 0。 */
+    /** 角色基础生命值。 */
     private Integer health;
-    /** 第二形态攻击力，例如鸟女变形后的攻击。 */
-    private Integer secondaryAttack;
-    /** 第二形态生命值，例如鸟女变形后的生命。 */
-    private Integer secondaryHealth;
     /** 前端展示用效果类型，实际结算由具体卡牌类实现。 */
     private EffectType effectType;
     /** 前端展示用效果分类。 */
@@ -39,5 +44,54 @@ public class CardDefinition {
     private Integer effectDuration;
     /** 技能作用范围，供前端选择目标和机器人预填目标使用。 */
     private SkillRange skillRange;
+    /** 角色或技能专属参数，例如鸟女的第二形态。 */
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    private Map<String, Object> exclusive = new LinkedHashMap<>();
+
+    @JsonIgnore
+    public Integer getSecondaryAttack() {
+        return exclusiveInteger("secondaryAttack");
+    }
+
+    @JsonSetter("secondaryAttack")
+    public void setSecondaryAttack(Integer secondaryAttack) {
+        setExclusiveInteger("secondaryAttack", secondaryAttack);
+    }
+
+    @JsonIgnore
+    public Integer getSecondaryHealth() {
+        return exclusiveInteger("secondaryHealth");
+    }
+
+    @JsonSetter("secondaryHealth")
+    public void setSecondaryHealth(Integer secondaryHealth) {
+        setExclusiveInteger("secondaryHealth", secondaryHealth);
+    }
+
+    private Integer exclusiveInteger(String key) {
+        Object value = exclusive == null ? null : exclusive.get(key);
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            try {
+                return Integer.parseInt(text);
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private void setExclusiveInteger(String key, Integer value) {
+        if (exclusive == null) {
+            exclusive = new LinkedHashMap<>();
+        }
+        if (value == null) {
+            exclusive.remove(key);
+            return;
+        }
+        exclusive.put(key, value);
+    }
 
 }

@@ -9,16 +9,30 @@
         <p class="hero-copy">显示当前可用的角色牌和技能牌，双击卡牌可查看高清大图</p>
       </div>
       <div class="cards-filter">
-        <button
-          v-for="item in filters"
-          :key="item.value"
-          class="alt"
-          :class="{ active: filter === item.value }"
-          type="button"
-          @click="filter = item.value"
-        >
-          {{ item.label }}
-        </button>
+        <div class="cards-filter-group" aria-label="卡牌类型筛选">
+          <button
+            v-for="item in typeFilters"
+            :key="item.value"
+            class="alt"
+            :class="{ active: typeFilter === item.value }"
+            type="button"
+            @click="typeFilter = item.value"
+          >
+            {{ item.label }}
+          </button>
+        </div>
+        <div class="cards-filter-group" aria-label="稀有度筛选">
+          <button
+            v-for="item in rarityFilters"
+            :key="item.value"
+            class="alt"
+            :class="{ active: rarityFilter === item.value }"
+            type="button"
+            @click="rarityFilter = item.value"
+          >
+            {{ item.label }}
+          </button>
+        </div>
       </div>
     </section>
 
@@ -69,13 +83,15 @@
         <div class="card-preview-head">
           <span class="catalog-type">{{ describeType(previewCard.type) }}</span>
           <span class="catalog-id">{{ previewCard.id }}</span>
+          <span class="catalog-id">行动点 {{ previewActionCost }}</span>
+          <span class="catalog-id">{{ describeRarity(previewCard.rarity) }}</span>
         </div>
         <div class="card-preview-title">
           <h2>{{ previewCard.name || "未命名卡牌" }}</h2>
           <div class="catalog-stats card-preview-stats">
             <template v-if="previewCard.type === 'CHARACTER'">
               <span>攻击 {{ describeAttack(previewCard) }}</span>
-              <span>体力 {{ previewCard.secondaryHealth != null ? `${previewCard.health || 0}/${previewCard.secondaryHealth}` : (previewCard.health || 0) }}</span>
+              <span>体力 {{ previewCard.exclusive?.secondaryHealth != null ? `${previewCard.health || 0}/${previewCard.exclusive.secondaryHealth}` : (previewCard.health || 0) }}</span>
             </template>
             <template v-else>
               <span>范围 {{ describeSkillRange(previewCard.skillRange) }}</span>
@@ -90,6 +106,14 @@
             <div class="preview-meta-block">
               <span class="summary-label">卡牌类型</span>
               <strong>{{ describeType(previewCard.type) }}</strong>
+            </div>
+            <div class="preview-meta-block">
+              <span class="summary-label">行动点消耗</span>
+              <strong>{{ previewActionCost }}</strong>
+            </div>
+            <div class="preview-meta-block">
+              <span class="summary-label">稀有度</span>
+              <strong>{{ describeRarity(previewCard.rarity) }}</strong>
             </div>
             <div class="preview-meta-block">
               <span class="summary-label">效果标签</span>
@@ -110,35 +134,45 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import AppTopbar from "../components/AppTopbar.vue";
 import CardTile from "../components/CardTile.vue";
-import { FILTER_TEXT } from "../lib/constants";
-import { api, cardImage, describeAttack, describeEffectCategory, describeEffectType, describeSkillRange, describeType, swapCardImageToFallback } from "../lib/game";
+import { FILTER_TEXT, RARITY_TEXT } from "../lib/constants";
+import { actionCostOf, api, cardImage, describeAttack, describeEffectCategory, describeEffectType, describeRarity, describeSkillRange, describeType, swapCardImageToFallback } from "../lib/game";
 import { assetRoot } from "../lib/runtime-config";
 import { showToast } from "../lib/toast";
 
 const cards = ref([]);
-const filter = ref("ALL");
+const typeFilter = ref("ALL");
+const rarityFilter = ref("ALL");
 const loading = ref(true);
 const assetBaseUrl = ref("");
 const previewCard = ref(null);
 const previewImageFailed = ref(false);
 
-const filters = [
+const typeFilters = [
   { value: "ALL", label: "全部" },
   { value: "CHARACTER", label: "角色牌" },
   { value: "SKILL", label: "技能牌" }
 ];
+const rarityFilters = [
+  { value: "ALL", label: "全部稀有度" },
+  { value: "COMMON", label: "普通" },
+  { value: "RARE", label: "稀有" }
+];
 
 const filteredCards = computed(() => {
-  return filter.value === "ALL" ? cards.value : cards.value.filter(card => card.type === filter.value);
+  return cards.value.filter(card => {
+    const typeMatched = typeFilter.value === "ALL" || card.type === typeFilter.value;
+    const rarityMatched = rarityFilter.value === "ALL" || card.rarity === rarityFilter.value;
+    return typeMatched && rarityMatched;
+  });
 });
 
-const filterLabel = computed(() => FILTER_TEXT[filter.value] || filter.value);
-const previewImage = computed(() => {
-  if (!previewCard.value) {
-    return "";
-  }
-  return cardImage(previewCard.value, {}, assetBaseUrl.value);
+const filterLabel = computed(() => {
+  const typeLabel = FILTER_TEXT[typeFilter.value] || typeFilter.value;
+  const rarityLabel = rarityFilter.value === "ALL" ? "全部稀有度" : (RARITY_TEXT[rarityFilter.value] || rarityFilter.value);
+  return `${typeLabel} / ${rarityLabel}`;
 });
+const previewImage = computed(() => previewCard.value ? cardImage(previewCard.value, {}, assetBaseUrl.value) : "");
+const previewActionCost = computed(() => actionCostOf(previewCard.value));
 
 watch(previewCard, () => {
   previewImageFailed.value = false;

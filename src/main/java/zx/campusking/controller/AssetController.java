@@ -46,6 +46,22 @@ public class AssetController {
     }
 
     /**
+     * 读取通用卡牌贴图，例如费用圆点和稀有边框。
+     *
+     * @param folder 贴图分类，只允许 cards
+     * @param textureId 贴图 id
+     * @return 图片二进制响应
+     */
+    @GetMapping("/card-textures/{folder}/{textureId}")
+    public ResponseEntity<byte[]> cardTexture(@PathVariable String folder, @PathVariable String textureId) {
+        AssetImageService.ImagePayload payload = assetImageService.loadCardTexture(folder, textureId);
+        return ResponseEntity.ok()
+          .cacheControl(CacheControl.maxAge(Duration.ofHours(12)).cachePublic())
+          .contentType(payload.mediaType())
+          .body(payload.bytes());
+    }
+
+    /**
      * 读取 resources 根目录下的 favicon。
      *
      * @return favicon 二进制响应

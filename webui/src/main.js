@@ -7,6 +7,7 @@ import "./styles/common.css";
 import "./styles/home.css";
 import "./styles/cards.css";
 import "./styles/battle.css";
+import "./styles/tuner.css";
 
 installEdgeHistoryWorkaround();
 document.documentElement.style.setProperty("--topbar-image", `url("${assetUrl("images/ui/topbar.png")}")`);

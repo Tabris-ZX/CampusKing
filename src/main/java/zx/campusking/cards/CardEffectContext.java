@@ -4,6 +4,7 @@ import zx.campusking.model.CardDefinition;
 import zx.campusking.model.CardInstance;
 import zx.campusking.model.MatchState;
 import zx.campusking.model.PlayerState;
+import zx.campusking.model.PreventableAction;
 import zx.campusking.model.StatusEffect;
 import zx.campusking.model.StatusEffectType;
 import zx.campusking.model.dto.PlayEffectRequest;
@@ -54,6 +55,22 @@ public record CardEffectContext(
     }
 
     /**
+     * 让技能使用者获得 1 点行动点，可超过回合上限。
+     */
+    public void gainActionPoint() {
+        player.setActionPoints(player.getActionPoints() + 1);
+        match.getLogs().add(player.getName() + " 获得了 1 点行动点.");
+    }
+
+    /**
+     * 对技能使用者造成伤害。
+     */
+    public void damageSelf(int damage) {
+        player.setHp(Math.max(0, player.getHp() - Math.max(0, damage)));
+        match.getLogs().add(player.getName() + " 受到了 " + Math.max(0, damage) + " 点伤害.");
+    }
+
+    /**
      * 把圣域类全局增益分发给目标玩家场上的每名角色。
      */
     public void applyGlobalBuff(PlayerState target) {
@@ -69,20 +86,12 @@ public record CardEffectContext(
     }
 
     /**
-     * 给技能使用者添加一次护盾效果。
+     * 给技能使用者添加“抵御下一次指定动作”的持续效果。
      */
-    public void applyShield() {
-        int duration = duration(1);
-        statusEffectService.applyOrRefreshEffect(player, new StatusEffect(StatusEffectType.SHIELD, "buff", 0, 1, duration, definition.getId()));
-    }
-
-    /**
-     * 给技能使用者添加“下一张敌方技能无效”的反制效果。
-     */
-    public void applyNegateNextSkill() {
-        statusEffectService.applyOrRefreshEffect(
+    public void applyPrevention(PreventableAction action) {
+        statusEffectService.applyPreventNextAction(
                 player,
-                new StatusEffect(StatusEffectType.NEGATE_NEXT_SKILL, "debuff", 0, 1, duration(1), definition.getId())
+                new StatusEffect(StatusEffectType.PREVENT_NEXT_ACTION, "buff", action.ordinal(), 1, duration(1), definition.getId())
         );
     }
 
@@ -100,13 +109,13 @@ public record CardEffectContext(
      * 对敌方场上全部角色造成当前技能数值的伤害。
      */
     public void damageAllEnemies() {
-        if (statusEffectService.consumeShield(enemy, match, enemy.getName())) {
+        if (statusEffectService.consumeActionPrevention(enemy, match, PreventableAction.SKILL_CARD, definition.getName())) {
             return;
         }
         for (CardInstance target : enemy.getBoard()) {
             target.setCurrentHealth(target.getCurrentHealth() - value());
         }
-        battleService.cleanupDefeated(match, enemy);
+        battleService.cleanupDefeated(match, enemy, player, deckService);
     }
 
     /**
@@ -124,16 +133,16 @@ public record CardEffectContext(
             CardInstance target = matchSupportService.requireBoardCard(player, request.getTargetInstanceId());
             int maxHealth = statusEffectService.effectiveMaxHealth(player, target);
             target.setCurrentHealth(Math.min(maxHealth, target.getCurrentHealth() + value()));
-            match.getLogs().add(battleService.cardName(target) + " 恢复了 " + value() + " 点生命。");
+            match.getLogs().add(battleService.cardName(target) + " 恢复了 " + value() + " 点生命.");
             return;
         }
 
         CardInstance target = matchSupportService.requireBoardCard(enemy, request.getTargetInstanceId());
-        if (!statusEffectService.consumeShield(enemy, match, battleService.cardName(target))) {
+        if (!statusEffectService.consumeActionPrevention(enemy, match, PreventableAction.SKILL_CARD, definition.getName())) {
             target.setCurrentHealth(target.getCurrentHealth() - value());
         }
-        battleService.cleanupDefeated(match, enemy);
-        match.getLogs().add(battleService.cardName(target) + " 受到了 " + value() + " 点伤害。");
+        battleService.cleanupDefeated(match, enemy, player, deckService);
+        match.getLogs().add(battleService.cardName(target) + " 受到了 " + value() + " 点伤害.");
     }
 
     /**
@@ -163,7 +172,7 @@ public record CardEffectContext(
         for (int index = 0; index < discarded.size(); index += 1) {
             deckService.drawOne(match, player);
         }
-        match.getLogs().add(player.getName() + " 弃置了 " + discarded.size() + " 张牌并抽取等量卡牌。");
+        match.getLogs().add(player.getName() + " 弃置了 " + discarded.size() + " 张牌并抽取等量卡牌.");
     }
 
     /**
@@ -171,11 +180,11 @@ public record CardEffectContext(
      */
     public void discardEnemyHand() {
         if (enemy.getHand().isEmpty()) {
-            match.getLogs().add(enemy.getName() + " 没有手牌可弃置。");
+            match.getLogs().add(enemy.getName() + " 没有手牌可弃置.");
             return;
         }
         CardInstance discarded = enemy.getHand().remove(0);
         match.getDiscardPile().add(discarded);
-        match.getLogs().add(enemy.getName() + " 被弃置了 1 张手牌。");
+        match.getLogs().add(enemy.getName() + " 被弃置了 1 张手牌.");
     }
 }

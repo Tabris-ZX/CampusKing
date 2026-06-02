@@ -1,0 +1,161 @@
+{
+  "characters" : [ {
+    "id" : "meal",
+    "name" : "饭卡",
+    "type" : "CHARACTER",
+    "description" : "无特性",
+    "actionCost" : 1,
+    "rarity" : "COMMON",
+    "attack" : 20,
+    "health" : 100
+  }, {
+    "id" : "sim",
+    "name" : "电话卡",
+    "type" : "CHARACTER",
+    "description" : "无特性",
+    "actionCost" : 1,
+    "rarity" : "COMMON",
+    "attack" : 30,
+    "health" : 70
+  }, {
+    "id" : "sniper",
+    "name" : "枪",
+    "type" : "CHARACTER",
+    "description" : "上场首回合要预瞄, 无法行动.",
+    "actionCost" : 2,
+    "rarity" : "RARE",
+    "attack" : 9999,
+    "health" : 30
+  }, {
+    "id" : "robin",
+    "name" : "鸟女",
+    "type" : "CHARACTER",
+    "description" : "双角色, 两个角色都死亡才会下场.",
+    "actionCost" : 1,
+    "rarity" : "COMMON",
+    "attack" : 20,
+    "health" : 20,
+    "exclusive" : {
+      "secondaryAttack" : 50,
+      "secondaryHealth" : 50
+    }
+  }, {
+    "id" : "dragon",
+    "name" : "龙骑",
+    "type" : "CHARACTER",
+    "description" : "攻击时会额外造成已损失体力值的伤害; 第一次死亡时回复至 1 点体力.",
+    "actionCost" : 2,
+    "rarity" : "RARE",
+    "attack" : 70,
+    "health" : 20
+  } ],
+  "skills" : [ {
+    "id" : "sanctuary",
+    "name" : "圣域",
+    "type" : "SKILL",
+    "description" : "行动阶段可用, 全场最大生命 +10, 每回合回复 10 点生命, 攻击力 +10.",
+    "actionCost" : 1,
+    "rarity" : "RARE",
+    "effectType" : "GLOBAL_BUFF",
+    "effectCategory" : "DURATION",
+    "effectValue" : 10,
+    "effectDuration" : 99,
+    "skillRange" : "BOTH"
+  }, {
+    "id" : "foresight",
+    "name" : "预见时间",
+    "type" : "SKILL",
+    "description" : "获得 1 点行动点, 然后玩家受到 5 点伤害.",
+    "actionCost" : 0,
+    "rarity" : "COMMON",
+    "effectType" : "NONE",
+    "effectCategory" : "INSTANT",
+    "effectValue" : 1,
+    "effectDuration" : 0,
+    "skillRange" : "SELF"
+  }, {
+    "id" : "light",
+    "name" : "圣光",
+    "type" : "SKILL",
+    "description" : "抵御下一次角色攻击.",
+    "actionCost" : 1,
+    "rarity" : "COMMON",
+    "effectType" : "PREVENT_ACTION",
+    "effectCategory" : "DURATION",
+    "effectValue" : 1,
+    "effectDuration" : 3,
+    "skillRange" : "SELF"
+  }, {
+    "id" : "soda",
+    "name" : "汽水",
+    "type" : "SKILL",
+    "description" : "抽 2, 我方召唤区一名角色 +40 生命, 或者对方召唤区一名角色 -40 生命.",
+    "actionCost" : 1,
+    "rarity" : "RARE",
+    "effectType" : "DRAW_AND_MODIFY_UNIT",
+    "effectCategory" : "INSTANT",
+    "effectValue" : 40,
+    "effectDuration" : 0,
+    "skillRange" : "SINGLE"
+  }, {
+    "id" : "elf",
+    "name" : "瓶中精灵",
+    "type" : "SKILL",
+    "description" : "使用后两回合内, 如果有己方角色死亡, 则其回复至体力上限的 1/5.",
+    "actionCost" : 1,
+    "rarity" : "RARE",
+    "effectType" : "REVIVE_ALLY",
+    "effectCategory" : "DURATION",
+    "effectValue" : 5,
+    "effectDuration" : 2,
+    "skillRange" : "SELF"
+  }, {
+    "id" : "bunch",
+    "name" : "普通一拳",
+    "type" : "SKILL",
+    "description" : "行动阶段可用, 对对方全体单位造成 15 点伤害.",
+    "actionCost" : 1,
+    "rarity" : "COMMON",
+    "effectType" : "DAMAGE_ALL_ENEMIES",
+    "effectCategory" : "INSTANT",
+    "effectValue" : 15,
+    "effectDuration" : 0,
+    "skillRange" : "ENEMY"
+  }, {
+    "id" : "umbrella",
+    "name" : "伞",
+    "type" : "SKILL",
+    "description" : "抵御对方下一张技能牌.",
+    "actionCost" : 1,
+    "rarity" : "COMMON",
+    "effectType" : "PREVENT_ACTION",
+    "effectCategory" : "DURATION",
+    "effectValue" : 1,
+    "effectDuration" : 1,
+    "skillRange" : "SELF"
+  }, {
+    "id" : "chips",
+    "name" : "赌徒筹码",
+    "type" : "SKILL",
+    "description" : "弃置至多 3 张牌, 然后抽等量的牌数.",
+    "actionCost" : 1,
+    "rarity" : "COMMON",
+    "effectType" : "DISCARD_AND_DRAW",
+    "effectCategory" : "INSTANT",
+    "effectValue" : 3,
+    "effectDuration" : 0,
+    "skillRange" : "SELF"
+  }, {
+    "id" : "hands",
+    "name" : "第三只手",
+    "type" : "SKILL",
+    "description" : "弃置对方 1 张手牌.",
+    "actionCost" : 1,
+    "rarity" : "COMMON",
+    "effectType" : "DISCARD_ENEMY_HAND",
+    "effectCategory" : "INSTANT",
+    "effectValue" : 1,
+    "effectDuration" : 0,
+    "skillRange" : "ENEMY"
+  } ]
+}

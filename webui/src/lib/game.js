@@ -1,4 +1,4 @@
-import { EFFECT_CATEGORY_TEXT, EFFECT_TYPE_TEXT, SKILL_RANGE_TEXT, TYPE_TEXT } from "./constants";
+import { EFFECT_CATEGORY_TEXT, EFFECT_TYPE_TEXT, RARITY_TEXT, SKILL_RANGE_TEXT, TYPE_TEXT } from "./constants";
 import { apiRoot } from "./runtime-config";
 
 export function buildInviteLink(roomCode, baseUrl = apiRoot()) {
@@ -70,24 +70,26 @@ export function describeEffectCategory(effectCategory) {
   return EFFECT_CATEGORY_TEXT[effectCategory] || effectCategory || "未定义";
 }
 
+export function describeRarity(rarity) {
+  return RARITY_TEXT[rarity] || rarity || "普通";
+}
+
 export function describeEffect(effect) {
   const suffix = effect.remainingTurns != null ? ` · ${effect.remainingTurns} 回合` : "";
   const stackSuffix = effect.stacks > 1 ? ` x${effect.stacks}` : "";
   switch (effect.type) {
     case "ATTACK_UP":
-      return `Buff：攻击 +${effect.value}${suffix}`;
+      return `状态: 攻击 +${effect.value}${stackSuffix}${suffix}`;
     case "MAX_HP_UP":
-      return `Buff：最大生命 +${effect.value}${suffix}`;
+      return `状态: 最大生命 +${effect.value}${stackSuffix}${suffix}`;
     case "TURN_HEAL":
-      return `Buff：回合回血 +${effect.value}${suffix}`;
-    case "SHIELD":
-      return `Buff：护盾${stackSuffix}${suffix}`;
-    case "NEGATE_NEXT_SKILL":
-      return `Debuff：对方技能无效${stackSuffix}${suffix}`;
+      return `状态: 回合开始回复 +${effect.value}${stackSuffix}${suffix}`;
+    case "PREVENT_NEXT_ACTION":
+      return `状态: 抵御下一次动作${stackSuffix}${suffix}`;
     case "REVIVE_ON_DEATH":
-      return `Buff：死亡后回复 1/${effect.value}${suffix}`;
+      return `状态: 死亡后回复 1/${effect.value}${stackSuffix}${suffix}`;
     default:
-      return `${effect.category === "debuff" ? "Debuff" : "Buff"}：${effect.type}${suffix}`;
+      return `状态: ${effect.type}${suffix}`;
   }
 }
 
@@ -95,15 +97,16 @@ export function describeAttack(card, currentFormIndex = 0) {
   if (!card) {
     return 0;
   }
-  if (card.attackText) {
-    return currentFormIndex > 0 && card.secondaryAttack != null
-      ? `${card.secondaryAttack}`
-      : card.attackText;
-  }
-  if (currentFormIndex > 0 && card.secondaryAttack != null) {
-    return card.secondaryAttack;
+  const secondaryAttack = card.exclusive?.secondaryAttack;
+  if (currentFormIndex > 0 && secondaryAttack != null) {
+    return secondaryAttack;
   }
   return card.attack || 0;
+}
+
+export function actionCostOf(card) {
+  const cost = Number(card?.actionCost);
+  return Number.isFinite(cost) ? Math.max(0, cost) : 1;
 }
 
 export function cardImage(cardOrId, cardsMap = {}, assetBaseUrl = "") {
@@ -118,6 +121,14 @@ export function cardImage(cardOrId, cardsMap = {}, assetBaseUrl = "") {
   }
   const base = apiRoot().replace(/\/$/, "");
   return `${base}/api/assets/card-images/${folder}/${card.id}`;
+}
+
+export function cardTexture(textureId) {
+  if (!textureId) {
+    return "";
+  }
+  const base = apiRoot().replace(/\/$/, "");
+  return `${base}/api/assets/card-textures/cards/${textureId}`;
 }
 
 export function swapCardImageToFallback(event, cardOrId, cardsMap = {}, assetBaseUrl = "") {

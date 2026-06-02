@@ -2,18 +2,20 @@ package zx.campusking.cards.skills;
 
 import zx.campusking.cards.BaseSkillCard;
 import zx.campusking.cards.CardEffectContext;
-import zx.campusking.model.EffectCategory;
-import zx.campusking.model.EffectType;
-import zx.campusking.model.SkillRange;
+import zx.campusking.model.CardDefinition;
+import zx.campusking.model.PreventableAction;
 
 public final class LightCard extends BaseSkillCard {
 
-    public LightCard() {
-        super(70, "light", "圣光", "完全抵御下一次伤害。", EffectType.SHIELD, EffectCategory.DURATION, 1, 1, SkillRange.SELF);
+    public static final String ID = "light";
+    public static final int ORDER = 70;
+
+    public LightCard(CardDefinition definition) {
+        super(ORDER, definition);
     }
 
     @Override
     public void resolveSkill(CardEffectContext context) {
-        context.applyShield();
+        context.applyPrevention(PreventableAction.CHARACTER_ATTACK);
     }
 }

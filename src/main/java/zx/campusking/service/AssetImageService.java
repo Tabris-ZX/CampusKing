@@ -80,6 +80,26 @@ public class AssetImageService {
         return payload;
     }
 
+    public ImagePayload loadCardTexture(String folder, String textureId) {
+        if (!"cards".equals(folder)) {
+            throw new NoSuchElementException("未知贴图目录: " + folder);
+        }
+        if (textureId == null || !textureId.matches("[a-zA-Z0-9_-]+")) {
+            throw new NoSuchElementException("未知卡牌贴图: " + textureId);
+        }
+
+        String relativePath = "images/texture/cards/" + textureId + ".png";
+        SourceImage sourceImage = readLocalSource(relativePath);
+        CachedImage cachedImage = cache.get(relativePath);
+        if (cachedImage != null && cachedImage.matches(sourceImage.cacheTag())) {
+            return cachedImage.payload();
+        }
+
+        ImagePayload payload = new ImagePayload(sourceImage.bytes(), sourceImage.mediaType());
+        cache.put(relativePath, new CachedImage(sourceImage.cacheTag(), payload));
+        return payload;
+    }
+
     private SourceImage readSourceImage(String relativePath) {
         if (!assetProperties.getBaseUrl().isBlank()) {
             return readRemoteSource(relativePath);

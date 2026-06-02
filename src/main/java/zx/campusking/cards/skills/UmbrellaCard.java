@@ -2,14 +2,16 @@ package zx.campusking.cards.skills;
 
 import zx.campusking.cards.BaseSkillCard;
 import zx.campusking.cards.CardEffectContext;
-import zx.campusking.model.EffectCategory;
-import zx.campusking.model.EffectType;
-import zx.campusking.model.SkillRange;
+import zx.campusking.model.CardDefinition;
+import zx.campusking.model.PreventableAction;
 
 public final class UmbrellaCard extends BaseSkillCard {
 
-    public UmbrellaCard() {
-        super(110, "umbrella", "伞", "使对方下一张技能牌无效。", EffectType.COUNTER_EFFECT, EffectCategory.DURATION, 1, 1, SkillRange.SELF);
+    public static final String ID = "umbrella";
+    public static final int ORDER = 110;
+
+    public UmbrellaCard(CardDefinition definition) {
+        super(ORDER, definition);
     }
 
     @Override
@@ -19,6 +21,6 @@ public final class UmbrellaCard extends BaseSkillCard {
 
     @Override
     public void resolveSkill(CardEffectContext context) {
-        context.applyNegateNextSkill();
+        context.applyPrevention(PreventableAction.SKILL_CARD);
     }
 }

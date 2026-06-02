@@ -59,13 +59,15 @@ public class MatchSupportService {
     }
 
     public CardInstance removeFromHand(PlayerState player, String instanceId) {
+        CardInstance card = requireHandCard(player, instanceId);
+        player.getHand().remove(card);
+        return card;
+    }
+
+    public CardInstance requireHandCard(PlayerState player, String instanceId) {
         return player.getHand().stream()
                 .filter(card -> card.getInstanceId().equals(instanceId))
                 .findFirst()
-                .map(card -> {
-                    player.getHand().remove(card);
-                    return card;
-                })
                 .orElseThrow(() -> new IllegalArgumentException("手牌中不存在该卡牌: " + instanceId));
     }
 

@@ -1,10 +1,14 @@
 package zx.campusking.cards.characters;
 
 import zx.campusking.cards.BaseCharacterCard;
+import zx.campusking.model.CardDefinition;
 
 public final class SimCard extends BaseCharacterCard {
 
-    public SimCard() {
-        super(20, "sim", "电话卡", "无特性", 30, null, 70, null, null);
+    public static final String ID = "sim";
+    public static final int ORDER = 20;
+
+    public SimCard(CardDefinition definition) {
+        super(ORDER, definition);
     }
 }

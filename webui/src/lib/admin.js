@@ -1,22 +1,6 @@
-const ANNOUNCEMENT_STORAGE_KEY = "campusking-admin-announcement";
 const ADMIN_PASSWORD_STORAGE_KEY = "campusking-admin-password";
 const ADMIN_AUTH_STORAGE_KEY = "campusking-admin-authenticated";
 const DEFAULT_ADMIN_PASSWORD = "123";
-
-const DEFAULT_ANNOUNCEMENT = `# 我常常追忆过去...
-`;
-
-export function loadAnnouncementMarkdown() {
-  try {
-    return localStorage.getItem(ANNOUNCEMENT_STORAGE_KEY) || DEFAULT_ANNOUNCEMENT;
-  } catch {
-    return DEFAULT_ANNOUNCEMENT;
-  }
-}
-
-export function saveAnnouncementMarkdown(markdown) {
-  localStorage.setItem(ANNOUNCEMENT_STORAGE_KEY, markdown || DEFAULT_ANNOUNCEMENT);
-}
 
 export function getAdminPassword() {
   try {
