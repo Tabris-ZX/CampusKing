@@ -11,7 +11,7 @@ import "./styles/effects.css";
 import "./styles/tuner.css";
 
 installEdgeHistoryWorkaround();
-document.documentElement.style.setProperty("--topbar-image", `url("${assetUrl("images/ui/topbar.png")}")`);
+document.documentElement.style.setProperty("--topbar-image", `url("${assetUrl("images/ui/topbar.webp")}")`);
 document.getElementById("app-favicon")?.setAttribute("href", assetRoot() ? assetUrl("favicon.ico") : `${apiRoot()}/api/assets/favicon.ico`);
 
 createApp(App).use(router).mount("#app");

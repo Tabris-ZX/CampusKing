@@ -60,6 +60,20 @@ webui
 └── package.json
 ```
 
+### 图片转 WebP
+
+原图放在 `resources/original/images/`，运行下面命令可将所有 PNG/JPG/JPEG 转成 WebP，并按相同目录结构输出到 `resources/images/`：
+
+```bash
+bash scripts/png-to-webp.sh
+```
+
+可选参数：
+
+```bash
+bash scripts/png-to-webp.sh --quality 82 --force
+```
+
 ### 配置
 
 主要配置在 `config/config.yaml`：
@@ -92,8 +106,8 @@ websocket:
 
 ```text
 resources/favicon.ico
-resources/images/texture/characters/dragon.png
-resources/images/texture/skills/soda.png
+resources/images/texture/characters/dragon.webp
+resources/images/texture/skills/soda.webp
 ```
 
 ### 新增卡牌

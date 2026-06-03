@@ -138,7 +138,7 @@ const props = defineProps({
 
 const route = useRoute();
 const router = useRouter();
-const titleImageUrl = computed(() => assetUrl("images/ui/title.png"));
+const titleImageUrl = computed(() => assetUrl("images/ui/title.webp"));
 const repoUrl = computed(() => githubUrl());
 const noticeOpen = ref(false);
 const docsOpen = ref(false);

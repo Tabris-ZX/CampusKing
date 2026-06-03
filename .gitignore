@@ -6,6 +6,7 @@ webui/dist/
 data
 logs
 config/config.yaml
+resources/images
 
 target/
 .mvn/wrapper/maven-wrapper.jar

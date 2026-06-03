@@ -52,7 +52,7 @@ public class AssetImageService {
             throw new NoSuchElementException("未知卡牌图片: " + cardId);
         }
 
-        String relativePath = "images/texture/" + safeFolder + "/" + cardId + ".png";
+        String relativePath = "images/texture/" + safeFolder + "/" + cardId + ".webp";
         SourceImage sourceImage = readSourceImage(relativePath);
         CachedImage cachedImage = cache.get(relativePath);
         if (cachedImage != null && cachedImage.matches(sourceImage.cacheTag())) {
@@ -105,7 +105,7 @@ public class AssetImageService {
             throw new NoSuchElementException("未知卡牌贴图: " + textureId);
         }
 
-        String relativePath = "images/texture/cards/" + textureId + ".png";
+        String relativePath = "images/texture/cards/" + textureId + ".webp";
         SourceImage sourceImage = readLocalSource(relativePath);
         CachedImage cachedImage = cache.get(relativePath);
         if (cachedImage != null && cachedImage.matches(sourceImage.cacheTag())) {
@@ -323,6 +323,10 @@ public class AssetImageService {
             } catch (IllegalArgumentException ignored) {
                 // Fall back to extension sniffing below.
             }
+        }
+
+        if (sourcePath != null && sourcePath.toLowerCase().endsWith(".webp")) {
+            return MediaType.parseMediaType("image/webp");
         }
 
         String guessed = URLConnection.guessContentTypeFromName(sourcePath);

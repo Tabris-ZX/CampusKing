@@ -37,7 +37,7 @@ body {
   color: var(--ink);
   background:
     linear-gradient(180deg, rgba(244, 248, 255, 0.38), rgba(223, 238, 255, 0.34)),
-    url("/api/assets/ui/background.png") center center / cover fixed no-repeat,
+    url("/api/assets/ui/background.webp") center center / cover fixed no-repeat,
     linear-gradient(180deg, var(--bg-top), var(--bg-bottom));
 }
 

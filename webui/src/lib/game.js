@@ -127,7 +127,7 @@ export function cardImage(cardOrId, cardsMap = {}, assetBaseUrl = "") {
   const folder = card.type === "SKILL" ? "skills" : "characters";
   const normalizedAssetBaseUrl = (assetBaseUrl || "").trim().replace(/\/$/, "");
   if (normalizedAssetBaseUrl) {
-    return `${normalizedAssetBaseUrl}/images/texture/${folder}/${card.id}.png`;
+    return `${normalizedAssetBaseUrl}/images/texture/${folder}/${card.id}.webp`;
   }
   const base = apiRoot().replace(/\/$/, "");
   return `${base}/api/assets/card-images/${folder}/${card.id}`;

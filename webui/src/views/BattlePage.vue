@@ -1176,9 +1176,9 @@ function playerAvatarImage(player) {
     return "";
   }
   if (player.playerToken === "BOT") {
-    return uiAssetImage("bot.png");
+    return uiAssetImage("bot.webp");
   }
-  return uiAssetImage(player.playerId === "P1" ? "avatar1.png" : "avatar2.jpg");
+  return uiAssetImage(player.playerId === "P1" ? "avatar1.webp" : "avatar2.webp");
 }
 
 function uiAssetImage(fileName) {
