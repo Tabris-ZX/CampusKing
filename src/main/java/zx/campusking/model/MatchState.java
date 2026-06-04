@@ -30,14 +30,28 @@ public class MatchState {
     private GamePhase phase;
     /** 当前回合计数。 */
     private int turn;
-    /** 胜利玩家 id，未结束时为空。 */
+    /** 整场比赛胜利玩家 id，未结束时为空。 */
     private String winnerId;
+    /** 最近一局胜利玩家 id，未结算小局时为空。 */
+    private String roundWinnerId;
+    /** 当前小局序号，从 1 开始。 */
+    private int roundNumber = 1;
+    /** 三局两胜所需胜场数。 */
+    private int winsRequired = 2;
+    /** P1 当前小局胜场。 */
+    private int p1Wins;
+    /** P2 当前小局胜场。 */
+    private int p2Wins;
+    /** 首局先手玩家 id。 */
+    private String firstRoundFirstPlayerId = "P1";
     /** 房间是否已满足开局条件。 */
     private boolean ready;
     /** 对局模式，默认双人 PVP。 */
     private BotMode mode = BotMode.PVP;
     /** 玩法类型，默认单面玩法。 */
     private MatchPlayType playType = MatchPlayType.SINGLE_SIDE;
+    /** 每名玩家上一回合行动阶段主动使用的最后一张技能牌。 */
+    private List<LastPlayedSkill> lastPlayedSkills = new ArrayList<>();
     /** 对局日志，前端用来展示最近发生的规则事件。 */
     private List<String> logs = new ArrayList<>();
 

@@ -1,80 +1,46 @@
 package zx.campusking.service;
 
-import org.springframework.stereotype.Service;
 import zx.campusking.model.CardInstance;
 import zx.campusking.model.GamePhase;
 import zx.campusking.model.MatchState;
 import zx.campusking.model.PlayerState;
 
-@Service
-public class MatchSupportService {
+/**
+ * 对局辅助接口。
+ * 提供玩家、手牌、场上角色定位以及阶段/状态校验。
+ */
+public interface MatchSupportService {
 
-    public String defaultName(String value, String fallback) {
-        return value == null || value.isBlank() ? fallback : value;
-    }
+    /** 返回非空默认名称。 */
+    String defaultName(String value, String fallback);
 
-    public PlayerState requireCurrentPlayer(MatchState match, String playerId) {
-        ensureNotFinished(match);
-        if (!match.getCurrentPlayerId().equals(playerId)) {
-            throw new IllegalStateException("当前不是玩家 " + playerId + " 的回合。");
-        }
-        return requirePlayer(match, playerId);
-    }
+    /** 读取并校验当前行动玩家。 */
+    PlayerState requireCurrentPlayer(MatchState match, String playerId);
 
-    public PlayerState requirePlayer(MatchState match, String playerId) {
-        return match.getPlayers().stream()
-                .filter(player -> player.getPlayerId().equals(playerId))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("未知玩家: " + playerId));
-    }
+    /** 按玩家 id 读取玩家。 */
+    PlayerState requirePlayer(MatchState match, String playerId);
 
-    public PlayerState requireOpponent(MatchState match, String playerId) {
-        return match.getPlayers().stream()
-                .filter(player -> !player.getPlayerId().equals(playerId))
-                .findFirst()
-                .orElseThrow();
-    }
+    /** 读取指定玩家的对手。 */
+    PlayerState requireOpponent(MatchState match, String playerId);
 
-    public void ensureActionPhase(MatchState match) {
-        ensureNotFinished(match);
-        ensurePhase(match, GamePhase.ACTION);
-    }
+    /** 校验当前处于行动阶段。 */
+    void ensureActionPhase(MatchState match);
 
-    public void ensureReady(MatchState match) {
-        if (!match.isReady()) {
-            throw new IllegalStateException("房间还在等待第二位玩家加入。");
-        }
-    }
+    /** 校验房间已可进行对局。 */
+    void ensureReady(MatchState match);
 
-    public void ensurePhase(MatchState match, GamePhase expectedPhase) {
-        if (match.getPhase() != expectedPhase) {
-            throw new IllegalStateException("当前阶段不是 " + expectedPhase + "。");
-        }
-    }
+    /** 校验当前阶段。 */
+    void ensurePhase(MatchState match, GamePhase expectedPhase);
 
-    public void ensureNotFinished(MatchState match) {
-        if (match.getPhase() == GamePhase.FINISHED) {
-            throw new IllegalStateException("对局已经结束。");
-        }
-    }
+    /** 校验对局未结束。 */
+    void ensureNotFinished(MatchState match);
 
-    public CardInstance removeFromHand(PlayerState player, String instanceId) {
-        CardInstance card = requireHandCard(player, instanceId);
-        player.getHand().remove(card);
-        return card;
-    }
+    /** 从手牌中移除并返回指定实例。 */
+    CardInstance removeFromHand(PlayerState player, String instanceId);
 
-    public CardInstance requireHandCard(PlayerState player, String instanceId) {
-        return player.getHand().stream()
-                .filter(card -> card.getInstanceId().equals(instanceId))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("手牌中不存在该卡牌: " + instanceId));
-    }
+    /** 从手牌中读取指定实例。 */
+    CardInstance requireHandCard(PlayerState player, String instanceId);
 
-    public CardInstance requireBoardCard(PlayerState player, String instanceId) {
-        return player.getBoard().stream()
-                .filter(card -> card.getInstanceId().equals(instanceId))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("场上不存在该角色: " + instanceId));
-    }
+    /** 从召唤区读取指定实例。 */
+    CardInstance requireBoardCard(PlayerState player, String instanceId);
 }

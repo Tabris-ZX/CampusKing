@@ -6,8 +6,8 @@
     "description" : "无特性",
     "actionCost" : 1,
     "rarity" : "COMMON",
-    "attack" : 20,
-    "health" : 100
+    "attack" : 30,
+    "health" : 125
   }, {
     "id" : "sim",
     "name" : "电话卡",
@@ -16,7 +16,7 @@
     "actionCost" : 1,
     "rarity" : "COMMON",
     "attack" : 60,
-    "health" : 40
+    "health" : 70
   }, {
     "id" : "water",
     "name" : "水卡",
@@ -24,8 +24,8 @@
     "description" : "无特性",
     "actionCost" : 1,
     "rarity" : "COMMON",
-    "attack" : 40,
-    "health" : 70
+    "attack" : 50,
+    "health" : 100
   }, {
     "id" : "sniper",
     "name" : "枪",
@@ -33,8 +33,8 @@
     "description" : "上场首回合要预瞄, 无法行动.",
     "actionCost" : 2,
     "rarity" : "RARE",
-    "attack" : 999,
-    "health" : 35
+    "attack" : 666,
+    "health" : 40
   }, {
     "id" : "robin",
     "name" : "鸟女",
@@ -42,8 +42,8 @@
     "description" : "双角色, 分为鸟和人, 初始攻击(20+50), 体力 50, 人被击败后, 保留鸟角色, 攻击 20, 体力 20",
     "actionCost" : 1,
     "rarity" : "COMMON",
-    "attack" : 70,
-    "health" : 50,
+    "attack" : 60,
+    "health" : 60,
     "exclusive" : {
       "secondaryAttack" : 20,
       "secondaryHealth" : 20
@@ -55,8 +55,8 @@
     "description" : "攻击时会额外造成已损失体力值的伤害; 第一次死亡时回复至 1 点体力.",
     "actionCost" : 2,
     "rarity" : "RARE",
-    "attack" : 60,
-    "health" : 20
+    "attack" : 70,
+    "health" : 40
   }, {
     "id" : "rupan",
     "name" : "猴头",
@@ -64,8 +64,17 @@
     "description" : "每次攻击造成伤害时, 随机弃置对方 1 张手牌.",
     "actionCost" : 2,
     "rarity" : "RARE",
+    "attack" : 45,
+    "health" : 80
+  }, {
+    "id" : "lcy",
+    "name" : "神秘海豚",
+    "type" : "CHARACTER",
+    "description" : "回合开始时, 如果该角色在召唤区, 则会把我方上回合行动阶段使用的最后1张技能牌免费打出一次",
+    "actionCost" : 2,
+    "rarity" : "RARE",
     "attack" : 40,
-    "health" : 50
+    "health" : 70
   } ],
   "skills" : [ {
     "id" : "sanctuary",
@@ -79,6 +88,19 @@
     "effectValue" : 10,
     "effectDuration" : 99,
     "skillRange" : "BOTH"
+  }, {
+    "id" : "alchemy",
+    "name" : "炼金术",
+    "type" : "SKILL",
+    "description" : "行动阶段可用, 弃置1张手牌. 被弃置牌若为: 普通牌, 则触发1次效果; 稀有牌, 则触发2次效果. (效果: 获得 1 点行动点并抽 1 张牌)",
+    "actionCost" : 0,
+    "rarity" : "COMMON",
+    "effectType" : "DISCARD_AND_DRAW",
+    "effectCategory" : "INSTANT",
+    "effectValue" : 1,
+    "effectDuration" : 0,
+    "skillRange" : "SELF",
+    "requiredHandDiscardCount" : 1
   }, {
     "id" : "foresight",
     "name" : "预借时间",
@@ -97,7 +119,7 @@
     "type" : "SKILL",
     "description" : "在2回合内, 抵御下一次角色受到的伤害.",
     "actionCost" : 1,
-    "rarity" : "COMMON",
+    "rarity" : "RARE",
     "effectType" : "PREVENT_ACTION",
     "effectCategory" : "DURATION",
     "effectValue" : 1,
@@ -136,7 +158,7 @@
     "rarity" : "COMMON",
     "effectType" : "DAMAGE_ALL_ENEMIES",
     "effectCategory" : "INSTANT",
-    "effectValue" : 20,
+    "effectValue" : 15,
     "effectDuration" : 0,
     "skillRange" : "ENEMY"
   }, {
@@ -145,7 +167,7 @@
     "type" : "SKILL",
     "description" : "3回合内, 抵御对方下一张技能牌.",
     "actionCost" : 1,
-    "rarity" : "COMMON",
+    "rarity" : "RARE",
     "effectType" : "PREVENT_ACTION",
     "effectCategory" : "DURATION",
     "effectValue" : 1,
@@ -168,7 +190,7 @@
     "name" : "第三只手",
     "type" : "SKILL",
     "description" : "行动阶段可用, 随机弃置对方 1 张手牌.",
-    "actionCost" : 0,
+    "actionCost" : 1,
     "rarity" : "COMMON",
     "effectType" : "DISCARD_ENEMY_HAND",
     "effectCategory" : "INSTANT",

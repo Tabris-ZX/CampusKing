@@ -42,6 +42,13 @@ public record CardEffectContext(
     }
 
     /**
+     * 读取一张对局实例对应的静态定义。
+     */
+    public CardDefinition cardDefinition(CardInstance card) {
+        return battleService.cardDefinition(card);
+    }
+
+    /**
      * 返回当前技能定义上的持续回合，未配置时使用调用方传入的默认值。
      */
     public int duration(int fallback) {
@@ -131,7 +138,7 @@ public record CardEffectContext(
     public void damageCharacter(PlayerState owner, CardInstance target, int amount) {
         int damage = Math.max(0, amount);
         int actualDamage = Math.max(0, Math.min(damage, target.getCurrentHealth()));
-        target.setCurrentHealth(target.getCurrentHealth() - damage);
+        target.setCurrentHealth(Math.max(0, target.getCurrentHealth() - damage));
         battleService.recordDamage(player, owner, actualDamage);
         battleService.cleanupDefeated(match, owner, player, deckService);
         match.getLogs().add(battleService.cardName(target) + " 受到了 " + actualDamage + " 点伤害.");
@@ -169,7 +176,7 @@ public record CardEffectContext(
         int totalDamage = 0;
         for (CardInstance target : owner.getBoard()) {
             totalDamage += Math.max(0, Math.min(damage, target.getCurrentHealth()));
-            target.setCurrentHealth(target.getCurrentHealth() - damage);
+            target.setCurrentHealth(Math.max(0, target.getCurrentHealth() - damage));
         }
         battleService.recordDamage(player, owner, totalDamage);
         battleService.cleanupDefeated(match, owner, player, deckService);
@@ -222,10 +229,14 @@ public record CardEffectContext(
 
     private String cardNames(List<CardInstance> cards) {
         return cards.stream()
-                .map(battleService::cardName)
+                .map(this::cardName)
                 .toList()
                 .toString()
                 .replace("[", "")
                 .replace("]", "");
+    }
+
+    public String cardName(CardInstance card) {
+        return battleService.cardName(card);
     }
 }

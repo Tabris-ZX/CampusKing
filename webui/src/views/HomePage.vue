@@ -103,6 +103,22 @@
             <small>{{ option.description }}</small>
           </button>
         </div>
+        <div class="first-player-control" role="radiogroup" aria-label="首局先手选择">
+          <div class="first-player-label">
+            <span>首局先手</span>
+            <small>后续小局自动交换</small>
+          </div>
+          <button
+            v-for="option in firstPlayerOptions"
+            :key="option.value"
+            class="first-player-option"
+            :class="{ active: firstPlayerId === option.value }"
+            type="button"
+            @click="firstPlayerId = option.value"
+          >
+            <span>{{ option.label }}</span>
+          </button>
+        </div>
         <label class="checkbox-row">
           <input v-model="botMode" type="checkbox">
           <span>创建人机模式房间</span>
@@ -150,9 +166,14 @@ const playerNameInput = ref("");
 const roomCodeInput = ref("");
 const botMode = ref(false);
 const playType = ref("SINGLE_SIDE");
+const firstPlayerId = ref("P1");
 const playTypeOptions = [
   { value: "SINGLE_SIDE", label: "单面玩法", description: "当前基础玩法" },
   { value: "DOUBLE_SIDE", label: "双面玩法", description: "暂未开放", disabled: true }
+];
+const firstPlayerOptions = [
+  { value: "P1", label: "房主先手", description: "第 1 局房主先手，第 2 局交换" },
+  { value: "P2", label: "对手先手", description: "第 1 局对手先手，第 2 局交换" }
 ];
 const entryMode = ref("");
 
@@ -221,7 +242,8 @@ async function createRoom() {
         hostName: playerName,
         playerToken,
         botMode: botMode.value,
-        playType: playType.value
+        playType: playType.value,
+        firstPlayerId: firstPlayerId.value
       })
     });
     session.value = {

@@ -1,6 +1,10 @@
 package zx.campusking.cards;
 
 import zx.campusking.model.CardDefinition;
+import zx.campusking.model.CardInstance;
+import zx.campusking.model.MatchState;
+import zx.campusking.model.PlayerState;
+import zx.campusking.service.TurnStartCharacterService;
 
 /**
  * 一张完整卡牌的通用接口。
@@ -62,10 +66,29 @@ public interface GameCard {
     }
 
     /**
+     * 技能牌额外需要从自己手牌中选择弃置的牌数。
+     * 服务层和前端读取这个通用输入需求, 不按具体卡牌 id 分支。
+     */
+    default int requiredHandDiscardCount() {
+        return 0;
+    }
+
+    /**
+     * 角色在己方回合开始时触发的特性。
+     */
+    default void onTurnStart(
+            MatchState match,
+            PlayerState owner,
+            CardInstance card,
+            TurnStartCharacterService turnStartCharacterService
+    ) {
+    }
+
+    /**
      * 角色攻击力修正 hook。
      * BattleService 会先算基础攻击和通用 Buff，再交给卡牌处理自己的特殊加成。
      */
-    default int modifyAttack(CardCombatContext context, int attack) {
+    default int modifyAttack(PlayerState owner, CardInstance card, CardDefinition definition, int baseHealth, int attack) {
         return attack;
     }
 
@@ -80,7 +103,7 @@ public interface GameCard {
      * 角色被击败时的特殊处理 hook。
      * 返回 true 表示卡牌已经自行处理死亡结果，BattleService 不再进入通用死亡流程。
      */
-    default boolean handleDefeated(CardDefeatContext context) {
+    default boolean handleDefeated(MatchState match, PlayerState owner, CardInstance card, CardDefinition definition) {
         return false;
     }
 }

@@ -44,6 +44,8 @@ public class CardDefinition {
     private Integer effectDuration;
     /** 技能作用范围，供前端选择目标和机器人预填目标使用。 */
     private SkillRange skillRange;
+    /** 技能额外需要从自己手牌中选择弃置的牌数。 */
+    private Integer requiredHandDiscardCount;
     /** 角色或技能专属参数，例如鸟女的第二形态。 */
     @JsonInclude(JsonInclude.Include.NON_EMPTY)
     private Map<String, Object> exclusive = new LinkedHashMap<>();

@@ -3,7 +3,7 @@ package zx.campusking.controller;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;
 import zx.campusking.config.AssetProperties;
-import zx.campusking.service.AssetImageService;
+import zx.campusking.service.Impl.AssetImageServiceImpl;
 
 import java.lang.reflect.Field;
 import java.util.NoSuchElementException;
@@ -19,7 +19,7 @@ class AssetControllerTests {
         forceLocalAssets(properties);
         properties.setLocalRoot("resources");
 
-        AssetImageService service = new AssetImageService(properties);
+        AssetImageServiceImpl service = new AssetImageServiceImpl(properties);
         AssetController controller = new AssetController(service);
 
         ResponseEntity<byte[]> response = controller.cardImage("characters", "dragon");
@@ -35,7 +35,7 @@ class AssetControllerTests {
         forceLocalAssets(properties);
         properties.setLocalRoot("resources");
 
-        AssetImageService service = new AssetImageService(properties);
+        AssetImageServiceImpl service = new AssetImageServiceImpl(properties);
         AssetController controller = new AssetController(service);
 
         assertThrows(NoSuchElementException.class, () -> controller.cardImage("characters", "not-found"));

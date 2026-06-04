@@ -31,18 +31,18 @@
               <section class="battle-log-panel top-log-panel">
                 <div class="zone-title">日志</div>
                 <div ref="logsRef" class="logs">
-                  <div v-if="!battleLogs.length" class="log-entry empty">暂无日志</div>
+                  <div v-if="!renderedBattleLogs.length" class="log-entry empty">暂无日志</div>
                   <div
-                    v-for="(log, index) in battleLogs"
-                    :key="logKey(log, index)"
+                    v-for="log in renderedBattleLogs"
+                    :key="log.key"
                     class="log-entry"
-                    :class="{ latest: highlightedLogKey === logKey(log, index) }"
+                    :class="{ latest: highlightedLogKey === log.key }"
                   >
-                    <span class="log-index">{{ String(index + 1).padStart(2, "0") }}</span>
+                    <span class="log-index">{{ log.number }}</span>
                     <span class="log-text">
                       <span
-                        v-for="(part, partIndex) in logParts(log)"
-                        :key="`${logKey(log, index)}-${partIndex}`"
+                        v-for="(part, partIndex) in log.parts"
+                        :key="`${log.key}-${partIndex}`"
                         :class="part.className"
                       >{{ part.text }}</span>
                     </span>
@@ -82,8 +82,14 @@
                       >
                     </div>
                     <div class="player-avatar-info">
-                      <div>{{ opponentPlayerLabel }}</div>
-                      <span>{{ opponentPlayer ? `${opponentPlayer.hp} / 100` : "" }}</span>
+                      <div class="player-name">{{ opponentPlayerLabel }}</div>
+                      <div v-if="opponentPlayer" class="player-compact-status" :class="playerToneClass(opponentPlayer)">
+                        <strong class="player-score">{{ playerWins(opponentPlayer) }}</strong>
+                        <div class="player-health-track">
+                          <div class="player-health-fill" :style="{ width: playerHpPercent(opponentPlayer) }"></div>
+                        </div>
+                        <span class="player-health-text">{{ opponentPlayer.hp }}</span>
+                      </div>
                     </div>
                   </div>
                   <div class="summon-zone">
@@ -164,8 +170,14 @@
                       >
                     </div>
                     <div class="player-avatar-info">
-                      <div>{{ selfPlayerLabel }}</div>
-                      <span>{{ selfPlayer ? `${selfPlayer.hp} / 100` : "" }}</span>
+                      <div class="player-name">{{ selfPlayerLabel }}</div>
+                      <div v-if="selfPlayer" class="player-compact-status" :class="playerToneClass(selfPlayer)">
+                        <strong class="player-score">{{ playerWins(selfPlayer) }}</strong>
+                        <div class="player-health-track">
+                          <div class="player-health-fill" :style="{ width: playerHpPercent(selfPlayer) }"></div>
+                        </div>
+                        <span class="player-health-text">{{ selfPlayer.hp }}</span>
+                      </div>
                     </div>
                   </div>
                   <div class="summon-zone">
@@ -352,7 +364,7 @@
       <div class="result-head">
         <span>对局结算</span>
         <strong>{{ winnerText }}</strong>
-        <small>总回合 {{ match?.turn || 0 }} · 房间 {{ roomCode || "------" }}</small>
+        <small>{{ matchScoreText }} · 最终小局 {{ match?.roundNumber || 1 }} · 房间 {{ roomCode || "------" }}</small>
       </div>
       <div class="result-stat-grid">
         <article
@@ -495,6 +507,7 @@ const discardSelectionIds = ref([]);
 const discardMode = ref(false);
 const selectedAttackerId = ref("");
 const pendingSkillTarget = ref(null);
+const pendingSkillDiscard = ref(null);
 const sacrificeMode = ref(false);
 const pollTimer = ref(null);
 const socket = ref(null);
@@ -521,6 +534,7 @@ const boardSlotMemory = ref({});
 const activeAttackVectors = ref({});
 const effectTimers = new Set();
 let handRowResizeObserver = null;
+let sessionPersistTimer = null;
 
 const PHASE_TEXT = {
   DRAW: "抽牌阶段",
@@ -542,7 +556,13 @@ const turnInfo = computed(() => {
   if (!match.value) {
     return "等待开始";
   }
-  return match.value.ready ? `第 ${match.value.turn} 回合` : "等待第二位玩家";
+  return match.value.ready ? `第 ${match.value.roundNumber || 1} 局 · 第 ${match.value.turn} 回合` : "等待第二位玩家";
+});
+const matchScoreText = computed(() => {
+  if (!match.value) {
+    return "0 : 0";
+  }
+  return `${match.value.p1Wins || 0} : ${match.value.p2Wins || 0}`;
 });
 
 const phaseText = computed(() => describePhase(match.value?.phase));
@@ -595,6 +615,18 @@ const selfSlots = computed(() => {
 const opponentEffects = computed(() => toEffectBadges(opponentPlayer.value));
 const selfEffects = computed(() => toEffectBadges(selfPlayer.value));
 const battleLogs = computed(() => match.value?.logs || []);
+const MAX_RENDERED_LOGS = 30;
+const renderedBattleLogs = computed(() => {
+  const startIndex = Math.max(0, battleLogs.value.length - MAX_RENDERED_LOGS);
+  return battleLogs.value.slice(startIndex).map((log, index) => {
+    const realIndex = startIndex + index;
+    return {
+      key: logKey(log, realIndex),
+      number: String(realIndex + 1).padStart(2, "0"),
+      parts: logParts(log)
+    };
+  });
+});
 const handCards = computed(() => selfPlayer.value?.hand || []);
 const selfSummonRemaining = computed(() => Math.max(0, 1 - (selfPlayer.value?.summonsThisTurn || 0)));
 const handRowStyle = computed(() => {
@@ -742,7 +774,10 @@ const detailImage = computed(() => {
 });
 
 const detailMark = computed(() => (detailDefinition.value.type === "SKILL" ? "技" : "角"));
-const detailCurrentHealth = computed(() => detailCard.value?.currentHealth || detailDefinition.value.health || 0);
+const detailCurrentHealth = computed(() => {
+  const maxHealth = currentFormHealth(detailDefinition.value, detailCard.value?.formIndex || 0);
+  return clampHealth(detailCard.value?.currentHealth, maxHealth);
+});
 const detailActionCost = computed(() => cardActionCost(detailCard.value?.cardId || detailCard.value?.id));
 const detailRarityFrame = computed(() => cardRarityFrame(detailCard.value?.cardId || detailCard.value?.id));
 
@@ -805,6 +840,10 @@ function synchronizeBoardSlotMemory(nextMatch) {
 
 function cardActionCost(cardId) {
   return actionCostOf(cardDef(cardId));
+}
+
+function skillRequiredDiscardCount(definition) {
+  return Math.max(0, Number(definition?.requiredHandDiscardCount) || 0);
 }
 
 function hasActionPoints(cost) {
@@ -893,6 +932,13 @@ function currentFormHealth(definition, formIndex = 0) {
   return Number(definition.health) || 0;
 }
 
+function clampHealth(value, fallbackMax = 0) {
+  const maxHealth = Math.max(0, Number(fallbackMax) || 0);
+  const rawHealth = value == null ? maxHealth : Number(value);
+  const currentHealth = Number.isFinite(rawHealth) ? rawHealth : maxHealth;
+  return Math.min(maxHealth, Math.max(0, currentHealth));
+}
+
 function boardAttack(card) {
   const definition = cardDef(card.cardId);
   const base = currentFormAttack(definition, card.formIndex || 0);
@@ -902,7 +948,8 @@ function boardAttack(card) {
 function boardHealth(card) {
   const definition = cardDef(card.cardId);
   const maxHealth = currentFormHealth(definition, card.formIndex || 0) + sumCardEffect(card, "MAX_HP_UP");
-  return `${card.currentHealth ?? maxHealth}/${maxHealth}`;
+  const currentHealth = clampHealth(card.currentHealth, maxHealth);
+  return `${currentHealth}/${maxHealth}`;
 }
 
 function boardCardStyle(instance) {
@@ -1026,7 +1073,7 @@ function cssEscape(value) {
   return String(value).replace(/["\\]/g, "\\$&");
 }
 
-function animateAttack(attackerInstanceId, targetSelector, delay = 680) {
+function animateAttack(attackerInstanceId, targetSelector, delay = 420) {
   const attackerElement = document.querySelector(`[data-board-card-id="${cssEscape(attackerInstanceId)}"]`);
   const targetElement = document.querySelector(targetSelector);
   const attackerCenter = elementCenter(attackerElement);
@@ -1046,7 +1093,7 @@ function animateAttack(attackerInstanceId, targetSelector, delay = 680) {
     delete nextVectors[attackerInstanceId];
     activeAttackVectors.value = nextVectors;
   }, delay);
-  return new Promise(resolve => window.setTimeout(resolve, delay));
+  return new Promise(resolve => window.setTimeout(resolve, Math.min(delay, 280)));
 }
 
 function animateCharacterAttack(attackerInstanceId, defenderInstanceId) {
@@ -1202,8 +1249,10 @@ function processMatchAnimations(nextMatch, previousMatch) {
         if (!previousCard) {
           return false;
         }
-        const nextHealth = card.currentHealth ?? card.health ?? 0;
-        const previousHealth = previousCard.currentHealth ?? previousCard.health ?? 0;
+        const nextDefinition = cardDef(card.cardId);
+        const previousDefinition = cardDef(previousCard.cardId);
+        const nextHealth = clampHealth(card.currentHealth, currentFormHealth(nextDefinition, card.formIndex || 0));
+        const previousHealth = clampHealth(previousCard.currentHealth, currentFormHealth(previousDefinition, previousCard.formIndex || 0));
         return nextHealth < previousHealth;
       })
       .map(([instanceId]) => instanceId);
@@ -1242,6 +1291,10 @@ function processMatchAnimations(nextMatch, previousMatch) {
 }
 
 function persistSession() {
+  if (sessionPersistTimer) {
+    window.clearTimeout(sessionPersistTimer);
+    sessionPersistTimer = null;
+  }
   saveSession({
     baseUrl: publicBaseUrl(),
     roomCode: roomCode.value,
@@ -1249,6 +1302,16 @@ function persistSession() {
     playerToken: playerToken.value,
     playerName: playerName.value
   });
+}
+
+function schedulePersistSession(delay = 240) {
+  if (sessionPersistTimer) {
+    window.clearTimeout(sessionPersistTimer);
+  }
+  sessionPersistTimer = window.setTimeout(() => {
+    sessionPersistTimer = null;
+    persistSession();
+  }, delay);
 }
 
 function resetLocalBattleState() {
@@ -1353,7 +1416,7 @@ function canTargetPlayer(player) {
   if (!player) {
     return false;
   }
-  if (pendingSkillTarget.value) {
+  if (pendingSkillTarget.value && !pendingSkillDiscard.value) {
     return true;
   }
   return !!selectedAttackerId.value && player.playerId !== selfPlayerId.value && player.board.length === 0;
@@ -1374,6 +1437,22 @@ function playerAvatarImage(player) {
     return uiAssetImage("bot.webp");
   }
   return uiAssetImage(player.playerId === "P1" ? "avatar1.webp" : "avatar2.webp");
+}
+
+function playerToneClass(player) {
+  return player?.playerId === "P1" ? "tone-p1" : "tone-p2";
+}
+
+function playerWins(player) {
+  if (!player) {
+    return 0;
+  }
+  return player.playerId === "P1" ? (match.value?.p1Wins || 0) : (match.value?.p2Wins || 0);
+}
+
+function playerHpPercent(player) {
+  const hp = Math.max(0, Math.min(100, Number(player?.hp) || 0));
+  return `${hp}%`;
 }
 
 function uiAssetImage(fileName) {
@@ -1407,8 +1486,10 @@ function handCardClass(instance) {
   return {
     "card-character": definition.type === "CHARACTER",
     "card-skill": definition.type === "SKILL",
-    selected: !discardMode.value && selectedHandId.value === instance.instanceId,
-    "discard-selected": discardSelectionIds.value.includes(instance.instanceId),
+    selected: !discardMode.value && !pendingSkillDiscard.value && selectedHandId.value === instance.instanceId,
+    "discard-selected": discardSelectionIds.value.includes(instance.instanceId)
+      || (pendingSkillDiscard.value?.selectedIds || []).includes(instance.instanceId),
+    "discard-target": canSelectSkillDiscard(instance),
     "fx-draw-arrival": drawnHandIds.value.includes(instance.instanceId)
   };
 }
@@ -1560,6 +1641,7 @@ async function confirmSelectedHand() {
   sacrificeMode.value = false;
   discardMode.value = false;
   discardSelectionIds.value = [];
+  pendingSkillDiscard.value = null;
   const selectedCard = selfPlayer.value.hand.find(card => card.instanceId === selectedHandId.value);
   if (!selectedCard) {
     return;
@@ -1573,6 +1655,10 @@ async function confirmSelectedHand() {
 }
 
 function handleHandCardClick(card) {
+  if (pendingSkillDiscard.value) {
+    selectSkillDiscard(card);
+    return;
+  }
   if (discardMode.value) {
     toggleDiscardSelection(card.instanceId);
     return;
@@ -1584,6 +1670,29 @@ function handleHandCardClick(card) {
   }
   selectedHandId.value = card.instanceId;
   pendingSkillTarget.value = null;
+}
+
+function canSelectSkillDiscard(card) {
+  return !!pendingSkillDiscard.value && card.instanceId !== pendingSkillDiscard.value.instanceId;
+}
+
+async function selectSkillDiscard(card) {
+  if (!canSelectSkillDiscard(card)) {
+    showToast("请选择另一张手牌弃置。", "error");
+    return;
+  }
+  const pending = pendingSkillDiscard.value;
+  const selectedIds = pending.selectedIds || [];
+  const requiredCount = Math.max(1, pending.requiredCount || 1);
+  const nextSelectedIds = selectedIds.includes(card.instanceId)
+    ? selectedIds.filter(id => id !== card.instanceId)
+    : [...selectedIds, card.instanceId].slice(0, requiredCount);
+  if (nextSelectedIds.length < requiredCount) {
+    pendingSkillDiscard.value = { ...pending, selectedIds: nextSelectedIds };
+    return;
+  }
+  pendingSkillDiscard.value = null;
+  await playSkill(pending.instanceId, pending.targetPlayerId, pending.targetInstanceId, nextSelectedIds.slice(0, requiredCount));
 }
 
 function toggleDiscardSelection(instanceId) {
@@ -1615,7 +1724,7 @@ async function summonCard(instanceId) {
   }
 }
 
-async function playSkill(instanceId, targetPlayerId = null, targetInstanceId = null) {
+async function playSkill(instanceId, targetPlayerId = null, targetInstanceId = null, discardInstanceIds = []) {
   try {
     const skillCard = selfPlayer.value?.hand.find(card => card.instanceId === instanceId);
     const definition = skillCard ? cardDef(skillCard.cardId) : null;
@@ -1628,13 +1737,21 @@ async function playSkill(instanceId, targetPlayerId = null, targetInstanceId = n
       showToast("这个技能只能选择场上角色，不能选择玩家。", "error");
       return;
     }
+    const requiredDiscardCount = skillRequiredDiscardCount(definition);
+    if (requiredDiscardCount > 0 && (discardInstanceIds?.length || 0) < requiredDiscardCount) {
+      pendingSkillDiscard.value = { instanceId, targetPlayerId, targetInstanceId, requiredCount: requiredDiscardCount, selectedIds: [] };
+      pendingSkillTarget.value = null;
+      showToast(`请选择 ${requiredDiscardCount} 张手牌作为技能弃置。`, "info");
+      return;
+    }
     match.value = await api(`/api/matches/${match.value.matchId}/play-skill`, {
       method: "POST",
       body: JSON.stringify({
         playerId: selfPlayerId.value,
         handInstanceId: instanceId,
         targetPlayerId,
-        targetInstanceId
+        targetInstanceId,
+        discardInstanceIds
       })
     });
     pendingSkillTarget.value = null;
@@ -1642,6 +1759,7 @@ async function playSkill(instanceId, targetPlayerId = null, targetInstanceId = n
     sacrificeMode.value = false;
     discardMode.value = false;
     discardSelectionIds.value = [];
+    pendingSkillDiscard.value = null;
     persistSession();
     showToast("技能已使用", "success");
   } catch (error) {
@@ -1651,8 +1769,8 @@ async function playSkill(instanceId, targetPlayerId = null, targetInstanceId = n
 
 async function attackCharacter(attackerInstanceId, defenderInstanceId) {
   try {
-    await animateCharacterAttack(attackerInstanceId, defenderInstanceId);
-    match.value = await api(`/api/matches/${match.value.matchId}/attack-character`, {
+    const attackAnimation = animateCharacterAttack(attackerInstanceId, defenderInstanceId);
+    const nextMatch = await api(`/api/matches/${match.value.matchId}/attack-character`, {
       method: "POST",
       body: JSON.stringify({
         playerId: selfPlayerId.value,
@@ -1660,10 +1778,13 @@ async function attackCharacter(attackerInstanceId, defenderInstanceId) {
         defenderInstanceId
       })
     });
+    await attackAnimation;
+    match.value = nextMatch;
     selectedAttackerId.value = "";
     sacrificeMode.value = false;
     discardMode.value = false;
     discardSelectionIds.value = [];
+    pendingSkillDiscard.value = null;
     persistSession();
     showToast("攻击已结算", "success");
   } catch (error) {
@@ -1681,14 +1802,17 @@ async function attackPlayer() {
     return;
   }
   try {
-    await animatePlayerAttack(selectedAttackerId.value, opponentPlayer.value.playerId);
-    match.value = await api(`/api/matches/${match.value.matchId}/attack-player`, {
+    const attackerInstanceId = selectedAttackerId.value;
+    const attackAnimation = animatePlayerAttack(attackerInstanceId, opponentPlayer.value.playerId);
+    const nextMatch = await api(`/api/matches/${match.value.matchId}/attack-player`, {
       method: "POST",
       body: JSON.stringify({
         playerId: selfPlayerId.value,
-        attackerInstanceId: selectedAttackerId.value
+        attackerInstanceId
       })
     });
+    await attackAnimation;
+    match.value = nextMatch;
     selectedAttackerId.value = "";
     sacrificeMode.value = false;
     discardMode.value = false;
@@ -1709,6 +1833,7 @@ function toggleSacrificeMode() {
   selectedHandId.value = "";
   discardMode.value = false;
   discardSelectionIds.value = [];
+  pendingSkillDiscard.value = null;
   pendingSkillTarget.value = null;
   showToast(sacrificeMode.value ? "请选择己方召唤区一名角色献祭。" : "已取消献祭。", "info");
 }
@@ -1763,6 +1888,7 @@ async function endTurn() {
       selectedAttackerId.value = "";
       sacrificeMode.value = false;
       pendingSkillTarget.value = null;
+      pendingSkillDiscard.value = null;
       showToast(`手牌超过上限，请选择 ${discardOverflow.value} 张手牌弃置。`, "info");
       return;
     }
@@ -1857,6 +1983,10 @@ function onKeydown(event) {
       pendingSkillTarget.value = null;
       return;
     }
+    if (pendingSkillDiscard.value) {
+      pendingSkillDiscard.value = null;
+      return;
+    }
     if (sacrificeMode.value) {
       sacrificeMode.value = false;
     }
@@ -1868,7 +1998,7 @@ watch(match, (value, oldValue) => {
     return;
   }
   synchronizeBoardSlotMemory(value);
-  persistSession();
+  schedulePersistSession();
   processMatchAnimations(value, oldValue);
   if (value.phase === "FINISHED" && !resultHandled.value) {
     resultHandled.value = true;
@@ -1913,6 +2043,10 @@ onBeforeUnmount(() => {
     window.removeEventListener("resize", updateHandRowWidth);
   }
   stopRealtime();
+  if (sessionPersistTimer) {
+    window.clearTimeout(sessionPersistTimer);
+    sessionPersistTimer = null;
+  }
   effectTimers.forEach(timer => window.clearTimeout(timer));
   effectTimers.clear();
 });

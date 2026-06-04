@@ -329,6 +329,58 @@
   font-weight: 800;
 }
 
+.first-player-control {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.8fr) repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  align-items: stretch;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(56, 102, 154, 0.12);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.first-player-label {
+  display: grid;
+  gap: 3px;
+  align-content: center;
+  min-width: 0;
+}
+
+.first-player-label span {
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.first-player-label small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.first-player-option {
+  min-height: 42px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(56, 102, 154, 0.16);
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+  box-shadow: none;
+}
+
+.first-player-option.active {
+  border-color: rgba(47, 95, 159, 0.86);
+  background: linear-gradient(180deg, rgba(79, 134, 217, 1), rgba(47, 95, 159, 1));
+  color: #fff;
+  box-shadow:
+    0 10px 20px rgba(79, 134, 217, 0.22),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.28);
+}
+
 .entry-form input {
   min-height: 50px;
   border-radius: 16px;
@@ -360,6 +412,7 @@
 @media (max-width: 720px) {
   .entry-grid,
   .play-type-options,
+  .first-player-control,
   .home-hero-actions,
   .entry-form-actions {
     grid-template-columns: 1fr;

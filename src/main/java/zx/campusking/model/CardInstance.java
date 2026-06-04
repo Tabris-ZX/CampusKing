@@ -11,8 +11,8 @@ import java.util.UUID;
  * 对局中的卡牌实例。
  * 同一张静态卡牌定义可以在不同玩家或不同对局中生成多个实例。
  */
-@Getter
 @Setter
+@Getter
 public class CardInstance {
 
     /** 实例唯一标识，前后端交互都依赖它。 */

@@ -19,5 +19,7 @@ public class CreateRoomRequest {
     private Boolean botMode;
     /** 玩法类型：SINGLE_SIDE 或 DOUBLE_SIDE。 */
     private String playType;
+    /** 首局先手玩家 id：P1 或 P2。 */
+    private String firstPlayerId;
 
 }
