@@ -287,6 +287,7 @@ public class GameService {
 
         // 召唤后的休整规则由具体卡牌类提供，避免主流程按卡牌 id 分支。
         card.setSleeping(cardCatalogService.requireCard(definition.getId()).sleepsOnSummon());
+        card.setBoardSlot(firstOpenBoardSlot(player));
         player.getBoard().add(card);
         player.setSummonsThisTurn(player.getSummonsThisTurn() + 1);
         match.getLogs().add(player.getName() + " 消耗 " + actionCost(definition) + " 点行动点, 召唤了 " + definition.getName() + ".");
@@ -391,7 +392,7 @@ public class GameService {
 
         int attackValue = battleService.computeAttack(player, attacker);
         boolean attackPrevented = statusEffectService.consumeActionPrevention(enemy, match, PreventableAction.CHARACTER_ATTACK, battleService.cardName(attacker) + " 的攻击");
-        boolean damaged = !attackPrevented && battleService.damageCharacter(match, attacker, defender, attackValue);
+        boolean damaged = !attackPrevented && battleService.damageCharacter(match, player, enemy, attacker, defender, attackValue);
 
         attacker.setSleeping(true);
         battleService.cleanupDefeated(match, enemy, player, deckService);
@@ -426,7 +427,9 @@ public class GameService {
         int attackValue = battleService.computeAttack(player, attacker);
         if (!statusEffectService.consumeActionPrevention(enemy, match, PreventableAction.CHARACTER_ATTACK, battleService.cardName(attacker) + " 的攻击")
                 && attackValue > 0) {
+            int actualDamage = Math.min(attackValue, enemy.getHp());
             enemy.setHp(Math.max(0, enemy.getHp() - attackValue));
+            battleService.recordDamage(player, enemy, actualDamage);
             resolveAfterAttackDamage(match, player, enemy, attacker, attackValue);
         }
 
@@ -533,6 +536,19 @@ public class GameService {
 
     private String playTypeName(MatchPlayType playType) {
         return playType == MatchPlayType.DOUBLE_SIDE ? "双面玩法" : "单面玩法";
+    }
+
+    private int firstOpenBoardSlot(PlayerState player) {
+        Set<Integer> usedSlots = player.getBoard().stream()
+                .map(CardInstance::getBoardSlot)
+                .filter(slot -> slot >= 1 && slot <= PlayerState.SUMMON_SLOTS)
+                .collect(java.util.stream.Collectors.toSet());
+        for (int slot = 1; slot <= PlayerState.SUMMON_SLOTS; slot += 1) {
+            if (!usedSlots.contains(slot)) {
+                return slot;
+            }
+        }
+        return Math.min(PlayerState.SUMMON_SLOTS, player.getBoard().size() + 1);
     }
 
     /**
@@ -672,7 +688,9 @@ public class GameService {
 
         if (player.getBoard().isEmpty()) {
             if (!attackPrevented && attackValue > 0) {
+                int actualDamage = Math.min(attackValue, player.getHp());
                 player.setHp(Math.max(0, player.getHp() - attackValue));
+                battleService.recordDamage(bot, player, actualDamage);
                 resolveAfterAttackDamage(match, bot, player, attacker, attackValue);
             }
             attacker.setSleeping(true);
@@ -682,7 +700,7 @@ public class GameService {
         }
 
         CardInstance defender = player.getBoard().get(0);
-        boolean damaged = !attackPrevented && battleService.damageCharacter(match, attacker, defender, attackValue);
+        boolean damaged = !attackPrevented && battleService.damageCharacter(match, bot, player, attacker, defender, attackValue);
         attacker.setSleeping(true);
         battleService.cleanupDefeated(match, player, bot, deckService);
         if (damaged) {
@@ -709,6 +727,7 @@ public class GameService {
         consumeActionPoints(bot, actionCost(definition));
         bot.getHand().remove(firstCharacter);
         firstCharacter.setSleeping(cardCatalogService.requireCard(definition.getId()).sleepsOnSummon());
+        firstCharacter.setBoardSlot(firstOpenBoardSlot(bot));
         bot.getBoard().add(firstCharacter);
         bot.setSummonsThisTurn(bot.getSummonsThisTurn() + 1);
         match.getLogs().add("瓦库消耗 " + actionCost(definition) + " 点行动点, 召唤了 " + definition.getName() + ".");

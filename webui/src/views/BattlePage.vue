@@ -70,6 +70,7 @@
                     <div
                       class="player-avatar"
                       :class="playerAvatarClass(opponentPlayer)"
+                      :data-player-id="opponentPlayer?.playerId || null"
                       @click="handlePlayerTarget(opponentPlayer)"
                     >
                       <img
@@ -97,6 +98,8 @@
                         v-else
                         class="card"
                         :class="boardCardClass(slot.card, false)"
+                        :style="boardCardStyle(slot.card)"
+                        :data-board-card-id="slot.card.instanceId"
                         @click="handleBoardCardClick(slot.card, opponentPlayer.playerId, false)"
                         @dblclick="openDetail(slot.card)"
                       >
@@ -149,6 +152,7 @@
                     <div
                       class="player-avatar"
                       :class="playerAvatarClass(selfPlayer)"
+                      :data-player-id="selfPlayer?.playerId || null"
                       @click="handlePlayerTarget(selfPlayer)"
                     >
                       <img
@@ -176,6 +180,8 @@
                         v-else
                         class="card"
                         :class="boardCardClass(slot.card, true)"
+                        :style="boardCardStyle(slot.card)"
+                        :data-board-card-id="slot.card.instanceId"
                         @click="handleBoardCardClick(slot.card, selfPlayer.playerId, true)"
                         @dblclick="openDetail(slot.card)"
                       >
@@ -341,6 +347,52 @@
     </section>
   </main>
 
+  <div class="detail-modal result-modal" :class="{ visible: showResultModal }" @click.self="showResultModal = false">
+    <section v-if="showResultModal" class="result-dialog panel">
+      <div class="result-head">
+        <span>对局结算</span>
+        <strong>{{ winnerText }}</strong>
+        <small>总回合 {{ match?.turn || 0 }} · 房间 {{ roomCode || "------" }}</small>
+      </div>
+      <div class="result-stat-grid">
+        <article
+          v-for="item in resultPlayers"
+          :key="item.player.playerId"
+          class="result-player-card"
+          :class="{ winner: item.isWinner, self: item.isSelf }"
+        >
+          <div class="result-player-top">
+            <span>{{ item.isSelf ? "我方" : "对方" }}</span>
+            <strong>{{ item.name }}</strong>
+            <em>{{ item.isWinner ? "胜利" : "落败" }}</em>
+          </div>
+          <div class="result-metrics">
+            <div>
+              <span>造成伤害</span>
+              <strong>{{ item.damageDealt }}</strong>
+            </div>
+            <div>
+              <span>受到伤害</span>
+              <strong>{{ item.damageTaken }}</strong>
+            </div>
+            <div>
+              <span>行动回合</span>
+              <strong>{{ item.turnsTaken }}</strong>
+            </div>
+            <div>
+              <span>剩余生命</span>
+              <strong>{{ item.hp }}</strong>
+            </div>
+          </div>
+        </article>
+      </div>
+      <div class="result-actions">
+        <button class="alt" type="button" @click="showResultModal = false">继续查看</button>
+        <button class="danger-button" type="button" :disabled="leavingBattle" @click="leaveBattle({ remote: false, silent: true })">返回首页</button>
+      </div>
+    </section>
+  </div>
+
   <div class="detail-modal" :class="{ visible: showDeckComposition }" @click.self="showDeckComposition = false">
     <section v-if="showDeckComposition" class="deck-composition-dialog panel">
       <button class="detail-close alt" type="button" @click="showDeckComposition = false">关闭</button>
@@ -464,6 +516,9 @@ const drawnHandIds = ref([]);
 const drawPulse = ref(false);
 const leavingBattle = ref(false);
 const resultHandled = ref(false);
+const showResultModal = ref(false);
+const boardSlotMemory = ref({});
+const activeAttackVectors = ref({});
 const effectTimers = new Set();
 let handRowResizeObserver = null;
 
@@ -530,17 +585,11 @@ const canConfirmSelectedHand = computed(() => {
 });
 
 const enemySlots = computed(() => {
-  return Array.from({ length: 3 }, (_, index) => ({
-    slot: index + 1,
-    card: opponentPlayer.value?.board?.[index] || null
-  }));
+  return playerBoardSlots(opponentPlayer.value);
 });
 
 const selfSlots = computed(() => {
-  return Array.from({ length: 3 }, (_, index) => ({
-    slot: index + 1,
-    card: selfPlayer.value?.board?.[index] || null
-  }));
+  return playerBoardSlots(selfPlayer.value);
 });
 
 const opponentEffects = computed(() => toEffectBadges(opponentPlayer.value));
@@ -660,6 +709,23 @@ const winnerText = computed(() => {
   }
   return "你失败了";
 });
+const resultPlayers = computed(() => {
+  return (match.value?.players || []).map(player => ({
+    player,
+    name: describeBattlePlayer(player, "等待玩家"),
+    isSelf: player.playerId === selfPlayerId.value,
+    isWinner: player.playerId === match.value?.winnerId,
+    damageDealt: player.damageDealt || 0,
+    damageTaken: player.damageTaken || 0,
+    turnsTaken: player.turnsTaken || 0,
+    hp: player.hp || 0
+  })).sort((left, right) => {
+    if (left.isSelf !== right.isSelf) {
+      return left.isSelf ? -1 : 1;
+    }
+    return left.player.playerId.localeCompare(right.player.playerId);
+  });
+});
 
 const detailDefinition = computed(() => {
   if (!detailCard.value) {
@@ -682,6 +748,59 @@ const detailRarityFrame = computed(() => cardRarityFrame(detailCard.value?.cardI
 
 function cardDef(cardId) {
   return cardsMap.value[cardId] || { id: cardId, name: cardId, description: "", type: "UNKNOWN" };
+}
+
+function playerBoardSlots(player) {
+  const rememberedSlots = boardSlotMemory.value[player?.playerId] || {};
+  const cardsBySlot = new Map((player?.board || []).map((card, index) => [
+    card.boardSlot || rememberedSlots[card.instanceId] || index + 1,
+    card
+  ]));
+  return Array.from({ length: 3 }, (_, index) => ({
+    slot: index + 1,
+    card: cardsBySlot.get(index + 1) || null
+  }));
+}
+
+function synchronizeBoardSlotMemory(nextMatch) {
+  if (!nextMatch) {
+    boardSlotMemory.value = {};
+    return;
+  }
+  const nextMemory = {};
+  (nextMatch.players || []).forEach(player => {
+    const previousPlayerMemory = boardSlotMemory.value[player.playerId] || {};
+    const usedSlots = new Set();
+    const playerMemory = {};
+
+    (player.board || []).forEach(card => {
+      const rememberedSlot = card.boardSlot || previousPlayerMemory[card.instanceId];
+      if (rememberedSlot >= 1 && rememberedSlot <= 3 && !usedSlots.has(rememberedSlot)) {
+        playerMemory[card.instanceId] = rememberedSlot;
+        usedSlots.add(rememberedSlot);
+      }
+    });
+
+    (player.board || []).forEach((card, index) => {
+      if (playerMemory[card.instanceId]) {
+        return;
+      }
+      const preferredSlot = index + 1;
+      if (preferredSlot <= 3 && !usedSlots.has(preferredSlot)) {
+        playerMemory[card.instanceId] = preferredSlot;
+        usedSlots.add(preferredSlot);
+        return;
+      }
+      const openSlot = [1, 2, 3].find(slot => !usedSlots.has(slot));
+      if (openSlot) {
+        playerMemory[card.instanceId] = openSlot;
+        usedSlots.add(openSlot);
+      }
+    });
+
+    nextMemory[player.playerId] = playerMemory;
+  });
+  boardSlotMemory.value = nextMemory;
 }
 
 function cardActionCost(cardId) {
@@ -786,6 +905,17 @@ function boardHealth(card) {
   return `${card.currentHealth ?? maxHealth}/${maxHealth}`;
 }
 
+function boardCardStyle(instance) {
+  const vector = activeAttackVectors.value[instance.instanceId];
+  if (!vector) {
+    return {};
+  }
+  return {
+    "--attack-x": `${vector.x}px`,
+    "--attack-y": `${vector.y}px`
+  };
+}
+
 function logKey(log, index) {
   return `${index}-${log}`;
 }
@@ -876,6 +1006,55 @@ function pulseDraw(delay = 900) {
   queueEffectReset(() => {
     drawPulse.value = false;
   }, delay);
+}
+
+function elementCenter(element) {
+  const rect = element?.getBoundingClientRect();
+  if (!rect) {
+    return null;
+  }
+  return {
+    x: rect.left + rect.width / 2,
+    y: rect.top + rect.height / 2
+  };
+}
+
+function cssEscape(value) {
+  if (window.CSS?.escape) {
+    return window.CSS.escape(value);
+  }
+  return String(value).replace(/["\\]/g, "\\$&");
+}
+
+function animateAttack(attackerInstanceId, targetSelector, delay = 680) {
+  const attackerElement = document.querySelector(`[data-board-card-id="${cssEscape(attackerInstanceId)}"]`);
+  const targetElement = document.querySelector(targetSelector);
+  const attackerCenter = elementCenter(attackerElement);
+  const targetCenter = elementCenter(targetElement);
+  if (attackerCenter && targetCenter) {
+    activeAttackVectors.value = {
+      ...activeAttackVectors.value,
+      [attackerInstanceId]: {
+        x: Math.round(targetCenter.x - attackerCenter.x),
+        y: Math.round(targetCenter.y - attackerCenter.y)
+      }
+    };
+  }
+  flashIds(attackingCardIds, [attackerInstanceId], delay);
+  queueEffectReset(() => {
+    const nextVectors = { ...activeAttackVectors.value };
+    delete nextVectors[attackerInstanceId];
+    activeAttackVectors.value = nextVectors;
+  }, delay);
+  return new Promise(resolve => window.setTimeout(resolve, delay));
+}
+
+function animateCharacterAttack(attackerInstanceId, defenderInstanceId) {
+  return animateAttack(attackerInstanceId, `[data-board-card-id="${cssEscape(defenderInstanceId)}"]`);
+}
+
+function animatePlayerAttack(attackerInstanceId, targetPlayerId) {
+  return animateAttack(attackerInstanceId, `[data-player-id="${cssEscape(targetPlayerId)}"]`);
 }
 
 function scrollLogsToBottom() {
@@ -1098,6 +1277,9 @@ function resetLocalBattleState() {
   drawnHandIds.value = [];
   drawPulse.value = false;
   resultHandled.value = false;
+  showResultModal.value = false;
+  boardSlotMemory.value = {};
+  activeAttackVectors.value = {};
 }
 
 function stopRealtime() {
@@ -1469,7 +1651,7 @@ async function playSkill(instanceId, targetPlayerId = null, targetInstanceId = n
 
 async function attackCharacter(attackerInstanceId, defenderInstanceId) {
   try {
-    flashIds(attackingCardIds, [attackerInstanceId], 520);
+    await animateCharacterAttack(attackerInstanceId, defenderInstanceId);
     match.value = await api(`/api/matches/${match.value.matchId}/attack-character`, {
       method: "POST",
       body: JSON.stringify({
@@ -1499,7 +1681,7 @@ async function attackPlayer() {
     return;
   }
   try {
-    flashIds(attackingCardIds, [selectedAttackerId.value], 520);
+    await animatePlayerAttack(selectedAttackerId.value, opponentPlayer.value.playerId);
     match.value = await api(`/api/matches/${match.value.matchId}/attack-player`, {
       method: "POST",
       body: JSON.stringify({
@@ -1685,15 +1867,14 @@ watch(match, (value, oldValue) => {
   if (!value) {
     return;
   }
+  synchronizeBoardSlotMemory(value);
   persistSession();
   processMatchAnimations(value, oldValue);
   if (value.phase === "FINISHED" && !resultHandled.value) {
     resultHandled.value = true;
     const isWinner = value.winnerId === selfPlayerId.value;
     showToast(isWinner ? "对局结束，你获胜了。" : "对局结束，你失败了。", isWinner ? "success" : "info");
-    window.setTimeout(() => {
-      leaveBattle({ remote: false, silent: true });
-    }, 1800);
+    showResultModal.value = true;
   }
 });
 

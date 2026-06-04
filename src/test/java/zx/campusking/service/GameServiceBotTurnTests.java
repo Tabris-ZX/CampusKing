@@ -163,10 +163,58 @@ class GameServiceBotTurnTests {
 
         MatchState result = service.endTurn(match.getMatchId(), human.getPlayerId());
 
-        assertEquals(70, defender.getCurrentHealth());
+        assertEquals(40, defender.getCurrentHealth());
+        assertEquals(60, bot.getDamageDealt());
+        assertEquals(60, human.getDamageTaken());
         assertTrue(attacker.isSleeping());
         assertEquals("P1", result.getCurrentPlayerId());
         assertTrue(result.getLogs().stream().anyMatch(log -> log.contains("瓦库使用 电话卡 攻击了 饭卡")));
+    }
+
+    @Test
+    void defeatedMiddleBoardCardDoesNotShiftRightCardSlot() throws IOException {
+        GameService service = createGameService();
+        CreateRoomRequest request = new CreateRoomRequest();
+        request.setBotMode(true);
+        request.setHostName("测试玩家");
+
+        MatchState match = service.createRoom(request);
+        PlayerState human = requirePlayer(match, "P1");
+        PlayerState bot = requirePlayer(match, "P2");
+
+        human.getBoard().clear();
+        CardInstance attacker = new CardInstance("sim", human.getPlayerId(), 40);
+        attacker.setSleeping(false);
+        human.getBoard().add(attacker);
+
+        bot.getBoard().clear();
+        CardInstance left = new CardInstance("meal", bot.getPlayerId(), 100);
+        left.setBoardSlot(1);
+        CardInstance middle = new CardInstance("meal", bot.getPlayerId(), 10);
+        middle.setBoardSlot(2);
+        CardInstance right = new CardInstance("water", bot.getPlayerId(), 70);
+        right.setBoardSlot(3);
+        bot.getBoard().add(left);
+        bot.getBoard().add(middle);
+        bot.getBoard().add(right);
+
+        match.setMode(BotMode.PVP);
+        match.setCurrentPlayerId(human.getPlayerId());
+        match.setPhase(GamePhase.ACTION);
+        match.setReady(true);
+        match.setTurn(2);
+
+        AttackCharacterRequest attackRequest = new AttackCharacterRequest();
+        attackRequest.setPlayerId(human.getPlayerId());
+        attackRequest.setAttackerInstanceId(attacker.getInstanceId());
+        attackRequest.setDefenderInstanceId(middle.getInstanceId());
+
+        service.attackCharacter(match.getMatchId(), attackRequest);
+
+        assertEquals(2, bot.getBoard().size());
+        assertEquals(1, left.getBoardSlot());
+        assertEquals(3, right.getBoardSlot());
+        assertTrue(bot.getBoard().stream().noneMatch(card -> card.getInstanceId().equals(middle.getInstanceId())));
     }
 
     @Test

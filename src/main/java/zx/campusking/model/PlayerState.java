@@ -35,6 +35,12 @@ public class PlayerState {
     private int summonsThisTurn;
     /** 当前回合剩余行动点。 */
     private int actionPoints = MAX_ACTION_POINTS;
+    /** 本局累计造成的伤害。 */
+    private int damageDealt;
+    /** 本局累计受到的伤害。 */
+    private int damageTaken;
+    /** 本局已经开始过的行动回合数。 */
+    private int turnsTaken;
     /** 玩家身上的持续状态效果。 */
     private final List<StatusEffect> statusEffects = new ArrayList<>();
     /** 玩家当前手牌。 */

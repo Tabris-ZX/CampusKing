@@ -59,6 +59,7 @@ public class MatchInitializerService {
      * 先手玩家第 1 回合额外抽 1 张。
      */
     public void startTurn(MatchState match, PlayerState player) {
+        player.setTurnsTaken(player.getTurnsTaken() + 1);
         player.setSummonsThisTurn(0);
         player.setActionPoints(PlayerState.MAX_ACTION_POINTS);
         int drawCount = match.getTurn() == 1 ? 3 : 2;

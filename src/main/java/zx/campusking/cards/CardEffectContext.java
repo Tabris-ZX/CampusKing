@@ -129,9 +129,12 @@ public record CardEffectContext(
      * 对目标角色造成伤害，并处理死亡清理和击败奖励。
      */
     public void damageCharacter(PlayerState owner, CardInstance target, int amount) {
-        target.setCurrentHealth(target.getCurrentHealth() - Math.max(0, amount));
+        int damage = Math.max(0, amount);
+        int actualDamage = Math.max(0, Math.min(damage, target.getCurrentHealth()));
+        target.setCurrentHealth(target.getCurrentHealth() - damage);
+        battleService.recordDamage(player, owner, actualDamage);
         battleService.cleanupDefeated(match, owner, player, deckService);
-        match.getLogs().add(battleService.cardName(target) + " 受到了 " + Math.max(0, amount) + " 点伤害.");
+        match.getLogs().add(battleService.cardName(target) + " 受到了 " + actualDamage + " 点伤害.");
     }
 
     /**
@@ -162,9 +165,13 @@ public record CardEffectContext(
      * 对目标玩家场上全部角色造成伤害。
      */
     public void damageBoard(PlayerState owner, int amount) {
+        int damage = Math.max(0, amount);
+        int totalDamage = 0;
         for (CardInstance target : owner.getBoard()) {
-            target.setCurrentHealth(target.getCurrentHealth() - Math.max(0, amount));
+            totalDamage += Math.max(0, Math.min(damage, target.getCurrentHealth()));
+            target.setCurrentHealth(target.getCurrentHealth() - damage);
         }
+        battleService.recordDamage(player, owner, totalDamage);
         battleService.cleanupDefeated(match, owner, player, deckService);
     }
 

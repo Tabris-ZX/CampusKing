@@ -31,6 +31,8 @@ public class CardInstance {
     private int extraLives;
     /** 当前形态序号，0 为初始形态。 */
     private int formIndex;
+    /** 当前召唤区格位，1 到 3；不在场上时为 0。 */
+    private int boardSlot;
     /** 当前作用在这名场上角色身上的状态效果。 */
     private final List<StatusEffect> statusEffects = new ArrayList<>();
 

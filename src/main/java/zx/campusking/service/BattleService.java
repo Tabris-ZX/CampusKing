@@ -60,13 +60,28 @@ public class BattleService {
     /**
      * 对角色造成伤害并写入日志。
      */
-    public boolean damageCharacter(MatchState match, CardInstance source, CardInstance target, int damage) {
+    public boolean damageCharacter(MatchState match, PlayerState sourceOwner, PlayerState targetOwner, CardInstance source, CardInstance target, int damage) {
         if (target.getCurrentHealth() <= 0 || damage <= 0) {
             return false;
         }
+        int actualDamage = Math.max(0, Math.min(damage, target.getCurrentHealth()));
         target.setCurrentHealth(target.getCurrentHealth() - damage);
-        match.getLogs().add(cardName(source) + " 对 " + cardName(target) + " 造成了 " + damage + " 点伤害.");
+        recordDamage(sourceOwner, targetOwner, actualDamage);
+        match.getLogs().add(cardName(source) + " 对 " + cardName(target) + " 造成了 " + actualDamage + " 点伤害.");
         return true;
+    }
+
+    public void recordDamage(PlayerState sourceOwner, PlayerState targetOwner, int damage) {
+        int actualDamage = Math.max(0, damage);
+        if (actualDamage <= 0) {
+            return;
+        }
+        if (sourceOwner != null) {
+            sourceOwner.setDamageDealt(sourceOwner.getDamageDealt() + actualDamage);
+        }
+        if (targetOwner != null) {
+            targetOwner.setDamageTaken(targetOwner.getDamageTaken() + actualDamage);
+        }
     }
 
     /**
