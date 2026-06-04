@@ -7,6 +7,7 @@ const defaultConfigPath = path.resolve(__dirname, "..", "..", "config", "config.
 
 const DEFAULT_CONFIG = {
   backendPort: 8080,
+  frontendPort: 5173,
   baseUrl: "/",
   apiBaseUrl: "",
   wsBaseUrl: "",
@@ -17,6 +18,7 @@ const DEFAULT_CONFIG = {
 
 const KEY_ALIASES = {
   "server.backendPort": "backendPort",
+  "server.frontendPort": "frontendPort",
   "frontend.baseUrl": "baseUrl",
   "frontend.apiBaseUrl": "apiBaseUrl",
   "frontend.wsBaseUrl": "wsBaseUrl",

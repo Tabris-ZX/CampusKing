@@ -4,8 +4,85 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WEBUI_DIR="$ROOT_DIR/webui"
 LOG_DIR="/home/zx/work/cpk/logs"
+CONFIG_FILE="${CAMPUSKING_WEBUI_CONFIG:-$ROOT_DIR/config/config.yaml}"
 
 mkdir -p "$LOG_DIR"
+
+config_value() {
+    local section="$1"
+    local key="$2"
+    local fallback="$3"
+
+    if [[ ! -f "$CONFIG_FILE" ]]; then
+        echo "$fallback"
+        return
+    fi
+
+    awk -v section="$section" -v key="$key" -v fallback="$fallback" '
+        function trim(value) {
+            sub(/^[[:space:]]+/, "", value)
+            sub(/[[:space:]]+$/, "", value)
+            return value
+        }
+        function clean(value) {
+            value = trim(value)
+            sub(/[[:space:]]+#.*$/, "", value)
+            value = trim(value)
+            if ((substr(value, 1, 1) == "\"" && substr(value, length(value), 1) == "\"") ||
+                (substr(value, 1, 1) == "'"'"'" && substr(value, length(value), 1) == "'"'"'")) {
+                value = substr(value, 2, length(value) - 2)
+            }
+            return value
+        }
+        /^[[:space:]]*#/ || /^[[:space:]]*$/ {
+            next
+        }
+        /^[^[:space:]][^:]*:[[:space:]]*$/ {
+            current = trim(substr($0, 1, index($0, ":") - 1))
+            next
+        }
+        {
+            line = $0
+            indent = match(line, /[^[:space:]]/) - 1
+            separator = index(line, ":")
+            if (separator <= 0) {
+                next
+            }
+            name = trim(substr(line, 1, separator - 1))
+            value = clean(substr(line, separator + 1))
+            if (indent > 0 && current == section && name == key) {
+                print value
+                found = 1
+                exit
+            }
+            if (indent == 0 && section == "" && name == key) {
+                print value
+                found = 1
+                exit
+            }
+        }
+        END {
+            if (!found) {
+                print fallback
+            }
+        }
+    ' "$CONFIG_FILE"
+}
+
+BACKEND_PORT="$(config_value server backendPort 8080)"
+FRONTEND_PORT="$(config_value server frontendPort 5173)"
+
+validate_port() {
+    local name="$1"
+    local port="$2"
+    if [[ ! "$port" =~ ^[0-9]+$ ]] || (( port < 1 || port > 65535 )); then
+        echo "Invalid $name in $CONFIG_FILE: $port" >&2
+        exit 1
+    fi
+}
+
+validate_port "server.backendPort" "$BACKEND_PORT"
+validate_port "server.frontendPort" "$FRONTEND_PORT"
 
 find_port_pids() {
     local port="$1"
@@ -73,8 +150,10 @@ if ! command -v npm >/dev/null 2>&1; then
     exit 1
 fi
 
-free_port 8080 "backend"
-free_port 5173 "frontend"
+echo "[*] Using backend port $BACKEND_PORT and frontend port $FRONTEND_PORT from $CONFIG_FILE"
+
+free_port "$BACKEND_PORT" "backend"
+free_port "$FRONTEND_PORT" "frontend"
 
 echo "[*] Converting source images to WebP..."
 bash "$ROOT_DIR/scripts/png-to-webp.sh"
@@ -93,7 +172,7 @@ echo "[+] Backend PID: $BACKEND_PID"
 
 echo "[*] Waiting for backend to start..."
 for i in $(seq 1 30); do
-    if curl -sf http://localhost:8080 >/dev/null 2>&1; then
+    if curl -sf "http://localhost:$BACKEND_PORT" >/dev/null 2>&1; then
         echo "[+] Backend is ready!"
         break
     fi
@@ -104,13 +183,9 @@ echo "[*] Starting frontend..."
 cd "$WEBUI_DIR" && npm run dev > "$LOG_DIR/frontend.log" 2>&1 &
 FRONTEND_PID=$!
 echo "[+] Frontend PID: $FRONTEND_PID"
-echo "[+] Frontend dev server started. Check $LOG_DIR/frontend.log for the actual port."
-
+echo "[+] Frontend dev server started on port $FRONTEND_PORT. "
+echo "All Successful!"
 echo ""
 echo "========== Services Running =========="
-echo "Backend:   PID=$BACKEND_PID  log=$LOG_DIR/backend.log"
-echo "Frontend:  PID=$FRONTEND_PID log=$LOG_DIR/frontend.log"
-echo "Press Ctrl+C to stop all services"
-echo "======================================"
 
 wait -n 2>/dev/null

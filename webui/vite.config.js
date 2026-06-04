@@ -6,6 +6,7 @@ import { loadWebuiConfig, normalizeBaseUrl } from "./scripts/load-config.mjs";
 const webuiConfig = loadWebuiConfig();
 const baseUrl = normalizeBaseUrl(webuiConfig.baseUrl);
 const backendPort = Number.parseInt(webuiConfig.backendPort, 10) || 8080;
+const frontendPort = Number.parseInt(webuiConfig.frontendPort, 10) || 5173;
 const apiProxyTarget = `http://127.0.0.1:${backendPort}`;
 const wsProxyTarget = `ws://127.0.0.1:${backendPort}`;
 
@@ -27,7 +28,7 @@ export default defineConfig({
     })
   },
   server: {
-    port: 5173,
+    port: frontendPort,
     host: "0.0.0.0",
     fs: {
       allow: [

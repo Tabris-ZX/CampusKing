@@ -81,6 +81,7 @@ bash scripts/png-to-webp.sh --quality 82 --force
 ```yaml
 server:
   backendPort: 8080
+  frontendPort: 5173
 
 frontend:
   baseUrl: ""
@@ -100,7 +101,7 @@ websocket:
   gamePath: "/ws/game"
 ```
 
-`server.backendPort` 同时控制 Spring Boot 后端端口和 Vite 本地开发代理目标端口。
+`server.backendPort` 控制 Spring Boot 后端端口和 Vite 本地开发代理目标端口，`server.frontendPort` 控制 Vite 前端开发服务端口。
 
 资源路径示例：
 

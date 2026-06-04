@@ -1,6 +1,10 @@
 server:
-  # backendPort: 后端服务端口,本地 Spring Boot 和 Vite 开发代理都会使用它
+  # backendPort: 后端服务端口
+  # frontendPort: 前端服务端口
+  # database: 
   backendPort: 8080
+  frontendPort: 5173
+  database: ""
 
 frontend:
   # baseUrl: 页面基础地址,用于生成邀请链接和 Vite 构建 base

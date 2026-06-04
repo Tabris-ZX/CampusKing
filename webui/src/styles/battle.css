@@ -874,10 +874,10 @@
 .card .card-cost-badge,
 .detail-card .card-cost-badge {
   position: absolute;
-  top: -10px;
-  left: -10px;
+  top: -11px;
+  left: -11px;
   z-index: 12;
-  width: 16.7%;
+  width: calc(16.7% + 2px);
   aspect-ratio: 1;
   display: grid;
   place-items: center;
@@ -1129,6 +1129,8 @@
 .detail-card {
   width: min(480px, 94vw);
   aspect-ratio: 5 / 7;
+  --card-art-inset: 0px;
+  --card-inner-radius: var(--radius-lg);
   border-radius: var(--radius-lg);
   overflow: visible;
   position: relative;
@@ -1137,8 +1139,17 @@
 }
 
 .detail-card .card-overlay {
+  left: 0;
+  right: 0;
+  bottom: 0;
   height: 42%;
-  backdrop-filter: blur(6px) saturate(1.05);
+  border-bottom-right-radius: var(--radius-lg);
+  border-bottom-left-radius: var(--radius-lg);
+  background:
+    linear-gradient(180deg, rgba(18, 35, 54, 0), rgba(18, 35, 54, 0.46) 30%, rgba(18, 35, 54, 0.68)),
+    rgba(244, 251, 255, 0.08);
+  backdrop-filter: blur(12px) saturate(1.12);
+  -webkit-backdrop-filter: blur(12px) saturate(1.12);
 }
 
 .detail-card .card-body {
@@ -1157,9 +1168,9 @@
 }
 
 .detail-card .card-cost-badge {
-  top: -10px;
-  left: -10px;
-  width: 80px;
+  top: -11px;
+  left: -11px;
+  width: 82px;
   font-size: 40px;
   -webkit-text-stroke-width: 1.4px;
 }
