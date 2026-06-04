@@ -312,8 +312,9 @@ public class GameService {
         target.setCurrentHealth(0);
         player.getBoard().remove(target);
         match.getDiscardPile().add(target);
+        player.setSummonsThisTurn(player.getSummonsThisTurn() - 1);
         deckService.drawOne(match, player);
-        match.getLogs().add(player.getName() + " 消耗 1 点行动点, 献祭了 " + battleService.cardName(target) + ". 该角色失去全部体力并进入墓地, 然后抽取了 1 张牌.");
+        match.getLogs().add(player.getName() + " 消耗 1 点行动点, 献祭了 " + battleService.cardName(target) + ". 该角色失去全部体力并进入墓地, 然后抽取了 1 张牌, 本回合可额外召唤 1 个角色.");
 
         broadcastMatch(match);
         return match;
@@ -390,21 +391,13 @@ public class GameService {
 
         int attackValue = battleService.computeAttack(player, attacker);
         boolean attackPrevented = statusEffectService.consumeActionPrevention(enemy, match, PreventableAction.CHARACTER_ATTACK, battleService.cardName(attacker) + " 的攻击");
-        if (!attackPrevented && battleService.damageCharacter(match, attacker, defender, attackValue)) {
-            cardCatalogService.requireCard(attacker.getCardId())
-                    .afterAttackDamage(new CardAttackDamageContext(
-                            match,
-                            player,
-                            enemy,
-                            attacker,
-                            cardCatalogService.require(attacker.getCardId()),
-                            attackValue,
-                            battleService
-                    ));
-        }
+        boolean damaged = !attackPrevented && battleService.damageCharacter(match, attacker, defender, attackValue);
 
         attacker.setSleeping(true);
         battleService.cleanupDefeated(match, enemy, player, deckService);
+        if (damaged) {
+            resolveAfterAttackDamage(match, player, enemy, attacker, attackValue);
+        }
         match.getLogs().add(battleService.cardName(attacker) + " 攻击了 " + battleService.cardName(defender) + ".");
         checkWinner(match);
 
@@ -434,16 +427,7 @@ public class GameService {
         if (!statusEffectService.consumeActionPrevention(enemy, match, PreventableAction.CHARACTER_ATTACK, battleService.cardName(attacker) + " 的攻击")
                 && attackValue > 0) {
             enemy.setHp(Math.max(0, enemy.getHp() - attackValue));
-            cardCatalogService.requireCard(attacker.getCardId())
-                    .afterAttackDamage(new CardAttackDamageContext(
-                            match,
-                            player,
-                            enemy,
-                            attacker,
-                            cardCatalogService.require(attacker.getCardId()),
-                            attackValue,
-                            battleService
-                    ));
+            resolveAfterAttackDamage(match, player, enemy, attacker, attackValue);
         }
 
         attacker.setSleeping(true);
@@ -452,6 +436,25 @@ public class GameService {
 
         broadcastMatch(match);
         return match;
+    }
+
+    private void resolveAfterAttackDamage(
+            MatchState match,
+            PlayerState attackerOwner,
+            PlayerState defenderOwner,
+            CardInstance attacker,
+            int attackValue
+    ) {
+        cardCatalogService.requireCard(attacker.getCardId())
+                .afterAttackDamage(new CardAttackDamageContext(
+                        match,
+                        attackerOwner,
+                        defenderOwner,
+                        attacker,
+                        cardCatalogService.require(attacker.getCardId()),
+                        attackValue,
+                        battleService
+                ));
     }
 
     /**
@@ -670,16 +673,7 @@ public class GameService {
         if (player.getBoard().isEmpty()) {
             if (!attackPrevented && attackValue > 0) {
                 player.setHp(Math.max(0, player.getHp() - attackValue));
-                cardCatalogService.requireCard(attacker.getCardId())
-                        .afterAttackDamage(new CardAttackDamageContext(
-                                match,
-                                bot,
-                                player,
-                                attacker,
-                                cardCatalogService.require(attacker.getCardId()),
-                                attackValue,
-                                battleService
-                        ));
+                resolveAfterAttackDamage(match, bot, player, attacker, attackValue);
             }
             attacker.setSleeping(true);
             match.getLogs().add("瓦库使用 " + battleService.cardName(attacker) + " 直接攻击了玩家 " + player.getName() + ".");
@@ -688,20 +682,12 @@ public class GameService {
         }
 
         CardInstance defender = player.getBoard().get(0);
-        if (!attackPrevented && battleService.damageCharacter(match, attacker, defender, attackValue)) {
-            cardCatalogService.requireCard(attacker.getCardId())
-                    .afterAttackDamage(new CardAttackDamageContext(
-                            match,
-                            bot,
-                            player,
-                            attacker,
-                            cardCatalogService.require(attacker.getCardId()),
-                            attackValue,
-                            battleService
-                    ));
-        }
+        boolean damaged = !attackPrevented && battleService.damageCharacter(match, attacker, defender, attackValue);
         attacker.setSleeping(true);
         battleService.cleanupDefeated(match, player, bot, deckService);
+        if (damaged) {
+            resolveAfterAttackDamage(match, bot, player, attacker, attackValue);
+        }
         match.getLogs().add("瓦库使用 " + battleService.cardName(attacker) + " 攻击了 " + battleService.cardName(defender) + ".");
         checkWinner(match);
         return true;

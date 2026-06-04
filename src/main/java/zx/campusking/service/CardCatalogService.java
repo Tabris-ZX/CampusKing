@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider;
 import org.springframework.core.type.filter.AssignableTypeFilter;
@@ -30,6 +32,7 @@ import java.util.stream.Collectors;
 @Service
 public class CardCatalogService {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(CardCatalogService.class);
     private static final Path REGISTRY_PATH = Path.of("src", "main", "java", "zx", "campusking", "cards", "cardRegistry.json");
 
     private final ObjectMapper objectMapper = new ObjectMapper()
@@ -37,6 +40,7 @@ public class CardCatalogService {
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     private final List<CardBinding> cardBindings;
     private final Map<String, CardBinding> bindingIndex;
+    private List<CardDefinition> registryCards;
     private List<CardDefinition> cards;
     private Map<String, CardDefinition> index;
     private List<GameCard> gameCards;
@@ -73,23 +77,30 @@ public class CardCatalogService {
         if (incomingCards == null || incomingCards.isEmpty()) {
             throw new IllegalArgumentException("卡牌配置不能为空");
         }
-        List<CardDefinition> normalized = normalizeRegistry(toRegistryMap(incomingCards));
+        Map<String, CardDefinition> registry = toRegistryMap(readRegistry());
+        if (registry.isEmpty() && registryCards != null) {
+            registry.putAll(toRegistryMap(registryCards));
+        }
+        registry.putAll(toRegistryMap(incomingCards));
+        List<CardDefinition> normalized = normalizeRegistry(registry);
         writeRegistry(normalized);
-        loadFrom(normalized);
+        loadPlayableFrom(normalized);
         return cards;
     }
 
     private synchronized void reloadRegistry() {
         List<CardDefinition> registryCards = readRegistry();
         List<CardDefinition> normalized = normalizeRegistry(toRegistryMap(registryCards));
-        if (normalized.isEmpty()) {
+        if (playableDefinitions(normalized).isEmpty()) {
             throw new IllegalStateException("卡牌注册表不能为空: " + REGISTRY_PATH);
         }
         writeRegistry(normalized);
-        loadFrom(normalized);
+        loadPlayableFrom(normalized);
     }
 
-    private void loadFrom(List<CardDefinition> loadedCards) {
+    private void loadPlayableFrom(List<CardDefinition> loadedRegistryCards) {
+        this.registryCards = loadedRegistryCards;
+        List<CardDefinition> loadedCards = playableDefinitions(loadedRegistryCards);
         this.cards = loadedCards.stream()
                 .sorted(Comparator.comparingInt(this::orderOf).thenComparing(CardDefinition::getId))
                 .toList();
@@ -103,9 +114,14 @@ public class CardCatalogService {
 
     private List<CardDefinition> normalizeRegistry(Map<String, CardDefinition> registry) {
         return registry.values().stream()
-                .filter(definition -> bindingIndex.containsKey(definition.getId()))
-                .map(this::normalizeDefinition)
+                .map(definition -> bindingIndex.containsKey(definition.getId()) ? normalizeDefinition(definition) : copyDefinition(definition))
                 .sorted(Comparator.comparingInt(this::orderOf).thenComparing(CardDefinition::getId))
+                .toList();
+    }
+
+    private List<CardDefinition> playableDefinitions(List<CardDefinition> definitions) {
+        return definitions.stream()
+                .filter(definition -> bindingIndex.containsKey(definition.getId()))
                 .toList();
     }
 
@@ -155,9 +171,6 @@ public class CardCatalogService {
         Map<String, CardDefinition> registry = new LinkedHashMap<>();
         for (CardDefinition definition : registryCards) {
             if (definition == null || definition.getId() == null || definition.getId().isBlank()) {
-                continue;
-            }
-            if (!bindingIndex.containsKey(definition.getId())) {
                 continue;
             }
             registry.put(definition.getId(), definition);
@@ -304,6 +317,7 @@ public class CardCatalogService {
         if (discovered.isEmpty()) {
             throw new IllegalStateException("No cards found in package: " + cardsPackage);
         }
+        LOGGER.info("Loaded card classes from {}: {}", cardsPackage, discovered.stream().map(CardBinding::id).toList());
         return discovered;
     }
 

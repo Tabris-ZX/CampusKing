@@ -76,6 +76,9 @@ fi
 free_port 8080 "backend"
 free_port 5173 "frontend"
 
+echo "[*] Converting source images to WebP..."
+bash "$ROOT_DIR/scripts/png-to-webp.sh"
+
 echo "[*] Starting backend..."
 if command -v mvn >/dev/null 2>&1; then
     cd "$ROOT_DIR" && mvn spring-boot:run > "$LOG_DIR/backend.log" 2>&1 &

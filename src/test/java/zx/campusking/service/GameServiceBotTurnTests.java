@@ -74,6 +74,22 @@ class GameServiceBotTurnTests {
     }
 
     @Test
+    void firstPlayerDrawsOneExtraCardOnFirstTurn() throws IOException {
+        GameService service = createGameService();
+        CreateRoomRequest request = new CreateRoomRequest();
+        request.setBotMode(true);
+        request.setHostName("测试玩家");
+
+        MatchState match = service.createRoom(request);
+        PlayerState firstPlayer = requirePlayer(match, "P1");
+        PlayerState secondPlayer = requirePlayer(match, "P2");
+
+        assertEquals(5, firstPlayer.getHand().size());
+        assertEquals(2, secondPlayer.getHand().size());
+        assertTrue(match.getLogs().stream().anyMatch(log -> log.contains("自动抽了 3 张牌")));
+    }
+
+    @Test
     void endingTurnInBotModeHandlesSingleTargetSkillWithoutThrowing() throws IOException {
         GameService service = createGameService();
         CreateRoomRequest request = new CreateRoomRequest();
@@ -504,6 +520,43 @@ class GameServiceBotTurnTests {
     }
 
     @Test
+    void sacrificeGrantsOneExtraSummonThisTurn() throws IOException {
+        GameService service = createGameService();
+        CreateRoomRequest request = new CreateRoomRequest();
+        request.setBotMode(true);
+        request.setHostName("测试玩家");
+
+        MatchState match = service.createRoom(request);
+        PlayerState human = requirePlayer(match, "P1");
+
+        human.getHand().clear();
+        CardInstance boardMeal = new CardInstance("meal", human.getPlayerId(), 100);
+        CardInstance secondMeal = new CardInstance("meal", human.getPlayerId(), 100);
+        human.getHand().add(secondMeal);
+        human.getBoard().clear();
+        human.getBoard().add(boardMeal);
+        human.setSummonsThisTurn(1);
+        human.setActionPoints(3);
+        match.setCurrentPlayerId(human.getPlayerId());
+        match.setPhase(GamePhase.ACTION);
+        match.setReady(true);
+
+        SacrificeRequest sacrificeRequest = new SacrificeRequest();
+        sacrificeRequest.setPlayerId(human.getPlayerId());
+        sacrificeRequest.setTargetInstanceId(boardMeal.getInstanceId());
+        service.sacrifice(match.getMatchId(), sacrificeRequest);
+        assertEquals(0, human.getSummonsThisTurn());
+
+        SummonRequest secondSummon = new SummonRequest();
+        secondSummon.setPlayerId(human.getPlayerId());
+        secondSummon.setHandInstanceId(secondMeal.getInstanceId());
+        service.summon(match.getMatchId(), secondSummon);
+
+        assertTrue(human.getBoard().stream().anyMatch(card -> card.getInstanceId().equals(secondMeal.getInstanceId())));
+        assertEquals(1, human.getSummonsThisTurn());
+    }
+
+    @Test
     void lightPreventsNextCharacterAttack() throws IOException {
         GameService service = createGameService();
         CreateRoomRequest request = new CreateRoomRequest();
@@ -719,7 +772,57 @@ class GameServiceBotTurnTests {
                 .filter(card -> bot.getPlayerId().equals(card.getOwnerId()))
                 .filter(card -> "sim".equals(card.getCardId()) || "sniper".equals(card.getCardId()))
                 .count());
-        assertTrue(match.getLogs().stream().anyMatch(log -> log.contains("猴子 触发特性")));
+        assertTrue(match.getLogs().stream().anyMatch(log -> log.contains("触发特性") && log.contains("弃置对方 1 张随机手牌")));
+    }
+
+    @Test
+    void rupanAttackTriggersDefeatCleanupBeforeDiscardTrait() throws IOException {
+        GameService service = createGameService();
+        CreateRoomRequest request = new CreateRoomRequest();
+        request.setBotMode(true);
+        request.setHostName("测试玩家");
+
+        MatchState match = service.createRoom(request);
+        PlayerState human = requirePlayer(match, "P1");
+        PlayerState bot = requirePlayer(match, "P2");
+
+        human.getHand().clear();
+        CardInstance elf = new CardInstance("elf", human.getPlayerId(), 0);
+        human.getHand().add(elf);
+        human.getBoard().clear();
+        CardInstance defender = new CardInstance("meal", human.getPlayerId(), 10);
+        human.getBoard().add(defender);
+        bot.getBoard().clear();
+        CardInstance rupan = new CardInstance("rupan", bot.getPlayerId(), 50);
+        rupan.setSleeping(false);
+        bot.getBoard().add(rupan);
+        human.getHand().add(new CardInstance("sim", human.getPlayerId(), 70));
+        human.setActionPoints(3);
+        bot.setActionPoints(3);
+        match.setCurrentPlayerId(human.getPlayerId());
+        match.setPhase(GamePhase.ACTION);
+        match.setReady(true);
+        match.setTurn(2);
+
+        PlayEffectRequest elfRequest = new PlayEffectRequest();
+        elfRequest.setPlayerId(human.getPlayerId());
+        elfRequest.setHandInstanceId(elf.getInstanceId());
+        service.playSkill(match.getMatchId(), elfRequest);
+
+        match.setCurrentPlayerId(bot.getPlayerId());
+        AttackCharacterRequest attackRequest = new AttackCharacterRequest();
+        attackRequest.setPlayerId(bot.getPlayerId());
+        attackRequest.setAttackerInstanceId(rupan.getInstanceId());
+        attackRequest.setDefenderInstanceId(defender.getInstanceId());
+        service.attackCharacter(match.getMatchId(), attackRequest);
+
+        assertEquals(20, defender.getCurrentHealth());
+        int reviveIndex = indexOfLogContaining(match, "死亡后回复到 20 点体力");
+        int rupanIndex = indexOfLogContaining(match, "触发特性");
+        int attackIndex = indexOfLogContaining(match, "攻击了 饭卡");
+        assertTrue(reviveIndex >= 0);
+        assertTrue(rupanIndex > reviveIndex);
+        assertTrue(attackIndex > rupanIndex);
     }
 
     private GameService createGameService() throws IOException {
@@ -754,6 +857,15 @@ class GameServiceBotTurnTests {
                 .filter(player -> playerId.equals(player.getPlayerId()))
                 .findFirst()
                 .orElseThrow();
+    }
+
+    private int indexOfLogContaining(MatchState match, String value) {
+        for (int index = 0; index < match.getLogs().size(); index += 1) {
+            if (match.getLogs().get(index).contains(value)) {
+                return index;
+            }
+        }
+        return -1;
     }
 
     private long countCards(List<CardInstance> deck, CardCatalogService cardCatalogService, CardType type, CardRarity rarity) {

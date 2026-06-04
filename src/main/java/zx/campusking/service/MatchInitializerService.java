@@ -55,13 +55,16 @@ public class MatchInitializerService {
     }
 
     /**
-     * 回合开始自动抽 2 张牌并进入行动阶段。
+     * 回合开始自动抽牌并进入行动阶段。
+     * 先手玩家第 1 回合额外抽 1 张。
      */
     public void startTurn(MatchState match, PlayerState player) {
         player.setSummonsThisTurn(0);
         player.setActionPoints(PlayerState.MAX_ACTION_POINTS);
-        deckService.drawOne(match, player);
-        deckService.drawOne(match, player);
+        int drawCount = match.getTurn() == 1 ? 3 : 2;
+        for (int index = 0; index < drawCount; index += 1) {
+            deckService.drawOne(match, player);
+        }
         statusEffectService.tickStatusDurations(player, match);
         statusEffectService.applyTurnStartEffects(match, player);
         if (match.getPhase() == GamePhase.FINISHED) {
@@ -69,7 +72,7 @@ public class MatchInitializerService {
         }
         wakeBoard(player);
         match.setPhase(GamePhase.ACTION);
-        match.getLogs().add(player.getName() + " 自动抽了 2 张牌.");
+        match.getLogs().add(player.getName() + " 自动抽了 " + drawCount + " 张牌.");
     }
 
     private void wakeBoard(PlayerState player) {

@@ -270,6 +270,7 @@
                 <div class="pile-box action-point-box">
                   <span>行动点</span>
                   <strong>{{ selfActionPoints }} / 3</strong>
+                  <small>可召唤 {{ selfSummonRemaining }}</small>
                 </div>
               </aside>
             </div>
@@ -445,6 +446,7 @@ const pendingSkillTarget = ref(null);
 const sacrificeMode = ref(false);
 const pollTimer = ref(null);
 const socket = ref(null);
+const socketConnected = ref(false);
 const detailCard = ref(null);
 const showDeckComposition = ref(false);
 const logsRef = ref(null);
@@ -545,30 +547,39 @@ const opponentEffects = computed(() => toEffectBadges(opponentPlayer.value));
 const selfEffects = computed(() => toEffectBadges(selfPlayer.value));
 const battleLogs = computed(() => match.value?.logs || []);
 const handCards = computed(() => selfPlayer.value?.hand || []);
+const selfSummonRemaining = computed(() => Math.max(0, 1 - (selfPlayer.value?.summonsThisTurn || 0)));
 const handRowStyle = computed(() => {
   const cardCount = handCards.value.length;
-  if (cardCount <= 1 || handRowWidth.value <= 0) {
+  if (cardCount <= 0 || handRowWidth.value <= 0) {
     return {
       "--hand-row-justify": "flex-start",
       "--hand-card-overlap": "0px",
-      "--hand-hover-spread": "0px"
+      "--hand-hover-spread": "0px",
+      "--hand-row-padding-x": "14px",
+      "--hand-card-gap": "0px"
     };
   }
 
   const cardWidth = handRowWidth.value <= 720 ? 160 : 154;
-  const sidePadding = 36;
   const minimumGap = 4;
   const maxOverlap = Math.round(cardWidth * 0.58);
-  const availableWidth = Math.max(cardWidth, handRowWidth.value - sidePadding);
-  const requiredGap = (availableWidth - cardWidth * cardCount) / Math.max(1, cardCount - 1);
-  const fitsWithoutOverlap = requiredGap >= minimumGap;
-  const overlap = fitsWithoutOverlap ? 0 : Math.min(maxOverlap, Math.max(0, Math.ceil(-requiredGap)));
+  const compressedSidePadding = 28;
+  const availableWidth = Math.max(cardWidth, handRowWidth.value);
+  const evenGap = (availableWidth - cardWidth * cardCount) / (cardCount + 1);
+  const fitsWithoutOverlap = evenGap >= minimumGap;
+  const compressedGap = cardCount > 1
+    ? (availableWidth - compressedSidePadding - cardWidth * cardCount) / (cardCount - 1)
+    : availableWidth - compressedSidePadding - cardWidth;
+  const overlap = fitsWithoutOverlap ? 0 : Math.min(maxOverlap, Math.max(0, Math.ceil(-compressedGap)));
   const hoverSpread = fitsWithoutOverlap ? 0 : Math.min(overlap, Math.max(20, Math.round(cardWidth * 0.16)));
+  const gap = fitsWithoutOverlap ? Math.floor(evenGap) : 0;
 
   return {
-    "--hand-row-justify": fitsWithoutOverlap ? "space-between" : "flex-start",
+    "--hand-row-justify": "flex-start",
     "--hand-card-overlap": `${overlap}px`,
-    "--hand-hover-spread": `${hoverSpread}px`
+    "--hand-hover-spread": `${hoverSpread}px`,
+    "--hand-row-padding-x": fitsWithoutOverlap ? `${gap}px` : "14px",
+    "--hand-card-gap": fitsWithoutOverlap ? `${gap}px` : "0px"
   };
 });
 const topDrawPileName = computed(() => {
@@ -1090,14 +1101,16 @@ function resetLocalBattleState() {
 }
 
 function stopRealtime() {
-  if (pollTimer.value) {
-    clearInterval(pollTimer.value);
-    pollTimer.value = null;
-  }
+  stopPolling();
   if (socket.value) {
+    socket.value.onopen = null;
+    socket.value.onmessage = null;
+    socket.value.onclose = null;
+    socket.value.onerror = null;
     socket.value.close();
     socket.value = null;
   }
+  socketConnected.value = false;
 }
 
 function persistNameOnlySession() {
@@ -1278,12 +1291,27 @@ function startPolling() {
   if (pollTimer.value) {
     clearInterval(pollTimer.value);
   }
+  if (socketConnected.value) {
+    return;
+  }
   pollTimer.value = setInterval(async () => {
+    if (socketConnected.value) {
+      clearInterval(pollTimer.value);
+      pollTimer.value = null;
+      return;
+    }
     try {
       await refreshRoom();
     } catch {
     }
-  }, 1800);
+  }, 5000);
+}
+
+function stopPolling() {
+  if (pollTimer.value) {
+    clearInterval(pollTimer.value);
+    pollTimer.value = null;
+  }
 }
 
 function connectSocket() {
@@ -1294,12 +1322,24 @@ function connectSocket() {
     socket.value.close();
   }
   socket.value = new WebSocket(`${wsRoot()}${wsGamePath()}?roomCode=${encodeURIComponent(roomCode.value)}`);
+  socket.value.onopen = () => {
+    socketConnected.value = true;
+    stopPolling();
+  };
   socket.value.onmessage = event => {
     try {
       match.value = JSON.parse(event.data);
       persistSession();
     } catch {
     }
+  };
+  socket.value.onclose = () => {
+    socketConnected.value = false;
+    startPolling();
+  };
+  socket.value.onerror = () => {
+    socketConnected.value = false;
+    startPolling();
   };
 }
 
@@ -1691,12 +1731,7 @@ onBeforeUnmount(() => {
   } else {
     window.removeEventListener("resize", updateHandRowWidth);
   }
-  if (pollTimer.value) {
-    clearInterval(pollTimer.value);
-  }
-  if (socket.value) {
-    socket.value.close();
-  }
+  stopRealtime();
   effectTimers.forEach(timer => window.clearTimeout(timer));
   effectTimers.clear();
 });

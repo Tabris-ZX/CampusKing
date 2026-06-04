@@ -5,7 +5,7 @@
     <section class="home-hero panel">
       <div class="home-hero-copy">
         <p class="eyebrow">Campus King</p>
-        <h1>我常常追忆过去...</h1>
+        <h1>宇宙冷漠...</h1>
         <p class="hero-copy">
           名字暂时保存在当前浏览器。点击“进入对局”后再选择创建房间或加入房间，
           卡牌资料页也可以随时打开查看。
