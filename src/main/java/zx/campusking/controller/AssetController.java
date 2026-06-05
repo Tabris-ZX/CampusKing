@@ -21,7 +21,7 @@ import java.util.NoSuchElementException;
  * 负责按当前资源配置读取卡牌图片，并在需要时压缩到前端可接受的大小。
  */
 @RestController
-@RequestMapping("/api/assets")
+@RequestMapping("/assets")
 public class AssetController {
 
     private final AssetImageService assetImageService;

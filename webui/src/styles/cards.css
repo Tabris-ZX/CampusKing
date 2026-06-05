@@ -189,7 +189,7 @@
   border-radius: 50%;
   border: 0;
   background:
-    url("/api/assets/card-textures/cards/actionPoints") center / contain no-repeat,
+    var(--action-point-image, url("/assets/card-textures/cards/actionPoints")) center / contain no-repeat,
     rgba(15, 36, 61, 0.72);
   color: #fff;
   font-size: clamp(18px, 8.3%, 25px);

@@ -236,7 +236,7 @@ async function createRoom() {
       return;
     }
     const playerToken = generateClientToken();
-    const match = await api("/api/rooms", {
+    const match = await api("/game/rooms", {
       method: "POST",
       body: JSON.stringify({
         hostName: playerName,
@@ -276,7 +276,7 @@ async function joinRoom(roomCodeOverride = "", options = {}) {
       return false;
     }
     const playerToken = generateClientToken();
-    const match = await api(`/api/rooms/${roomCode}/join`, {
+    const match = await api(`/game/rooms/${roomCode}/join`, {
       method: "POST",
       body: JSON.stringify({ playerName, playerToken })
     });
@@ -385,7 +385,7 @@ async function leavePreviousRoomIfNeeded(nextRoomCode) {
     return;
   }
   try {
-    await api(`/api/rooms/${saved.roomCode}/leave`, {
+    await api(`/game/rooms/${saved.roomCode}/leave`, {
       method: "POST",
       body: JSON.stringify({ playerToken: saved.playerToken })
     });
@@ -405,7 +405,7 @@ async function handleInviteJoin() {
   const saved = loadSession();
   if (saved?.roomCode === inviteRoomCode && saved?.playerToken) {
     try {
-      await api(`/api/rooms/${inviteRoomCode}/session/${saved.playerToken}`);
+      await api(`/game/rooms/${inviteRoomCode}/session/${saved.playerToken}`);
       showToast("检测到邀请链接，正在恢复房间", "success");
       router.replace("/battle");
     } catch (error) {
@@ -453,7 +453,7 @@ onMounted(async () => {
     roomCodeInput.value = session.value.roomCode;
     if (session.value.roomCode) {
       try {
-        currentMatch.value = await api(`/api/rooms/${session.value.roomCode}`);
+        currentMatch.value = await api(`/game/rooms/${session.value.roomCode}`);
       } catch (error) {
         if (isMissingRoomError(error)) {
           clearSession();

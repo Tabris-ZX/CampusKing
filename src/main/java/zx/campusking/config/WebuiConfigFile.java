@@ -1,6 +1,8 @@
 package zx.campusking.config;
 
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -15,6 +17,7 @@ public final class WebuiConfigFile {
     private static final int DEFAULT_MAX_RESPONSE_BYTES = 1024 * 1024;
     private static final String DEFAULT_CARDS_PACKAGE = "zx.campusking.cards";
     private static final int DEFAULT_BACKEND_PORT = 8080;
+    private static final String DEFAULT_CONTEXT_PATH = "";
 
     private WebuiConfigFile() {
     }
@@ -46,8 +49,12 @@ public final class WebuiConfigFile {
                 config.string("server.backendPort", config.string("backendPort", "")),
                 DEFAULT_BACKEND_PORT
         );
+        String contextPath = normalizeContextPath(config.string(
+                "server.contextPath",
+                contextPathFromUrl(config.string("backend.baseUrl", config.string("apiBaseUrl", "")))
+        ));
 
-        return new ServerDefaults(backendPort);
+        return new ServerDefaults(backendPort, contextPath);
     }
 
     public static CardDefaults loadCardDefaults() {
@@ -173,7 +180,7 @@ public final class WebuiConfigFile {
     }
 
     private static ServerDefaults defaultServerDefaults() {
-        return new ServerDefaults(DEFAULT_BACKEND_PORT);
+        return new ServerDefaults(DEFAULT_BACKEND_PORT, DEFAULT_CONTEXT_PATH);
     }
 
     private static CorsDefaults defaultCorsDefaults() {
@@ -233,6 +240,30 @@ public final class WebuiConfigFile {
         return parsed <= 65535 ? parsed : defaultValue;
     }
 
+    private static String contextPathFromUrl(String rawValue) {
+        if (rawValue == null || rawValue.isBlank()) {
+            return DEFAULT_CONTEXT_PATH;
+        }
+        try {
+            URI uri = new URI(rawValue.trim());
+            return uri.getPath();
+        } catch (URISyntaxException ignored) {
+            return DEFAULT_CONTEXT_PATH;
+        }
+    }
+
+    private static String normalizeContextPath(String rawValue) {
+        if (rawValue == null || rawValue.isBlank() || "/".equals(rawValue.trim())) {
+            return DEFAULT_CONTEXT_PATH;
+        }
+        String normalized = rawValue.trim();
+        if (!normalized.startsWith("/")) {
+            normalized = "/" + normalized;
+        }
+        normalized = normalized.replaceAll("/+$", "");
+        return normalized.isBlank() ? DEFAULT_CONTEXT_PATH : normalized;
+    }
+
     private static long parseLongOrDefault(String rawValue, long defaultValue) {
         try {
             long parsed = Long.parseLong(rawValue);
@@ -279,7 +310,7 @@ public final class WebuiConfigFile {
     public record CardDefaults(String cardsPackage) {
     }
 
-    public record ServerDefaults(int backendPort) {
+    public record ServerDefaults(int backendPort, String contextPath) {
     }
 
     public record CorsDefaults(

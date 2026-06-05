@@ -89,6 +89,9 @@ frontend:
   wsBaseUrl: ""
   githubUrl: "https://github.com/Tabris-ZX/CampusKing"
 
+backend:
+  baseUrl: ""
+
 asset:
   baseUrl: ""
   localRoot: "resources"
@@ -102,6 +105,7 @@ websocket:
 ```
 
 `server.backendPort` 控制 Spring Boot 后端端口和 Vite 本地开发代理目标端口，`server.frontendPort` 控制 Vite 前端开发服务端口。
+`frontend.apiBaseUrl` 或 `backend.baseUrl` 可指定前端请求的后端接口根地址。
 
 资源路径示例：
 

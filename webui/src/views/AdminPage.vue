@@ -219,7 +219,7 @@ onMounted(loadCards);
 async function loadCards() {
   loadingCards.value = true;
   try {
-    cards.value = (await api("/api/cards")).map(normalizeCard);
+    cards.value = (await api("/game/cards")).map(normalizeCard);
     selectedCardId.value = cards.value[0]?.id || "";
   } catch (error) {
     showToast(error.message, "error");
@@ -235,7 +235,7 @@ async function saveAnnouncement() {
   }
   savingNotice.value = true;
   try {
-    const notice = await api("/api/notices", {
+    const notice = await api("/game/notices", {
       method: "POST",
       body: JSON.stringify({ markdown: announcementMarkdown.value })
     });
@@ -251,7 +251,7 @@ async function saveAnnouncement() {
 async function saveCards() {
   savingCards.value = true;
   try {
-    cards.value = (await api("/api/cards", {
+    cards.value = (await api("/game/cards", {
       method: "POST",
       body: JSON.stringify({ cards: cards.value.map(normalizeCard) })
     })).map(normalizeCard);

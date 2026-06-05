@@ -21,6 +21,7 @@ const KEY_ALIASES = {
   "server.frontendPort": "frontendPort",
   "frontend.baseUrl": "baseUrl",
   "frontend.apiBaseUrl": "apiBaseUrl",
+  "backend.baseUrl": "apiBaseUrl",
   "frontend.wsBaseUrl": "wsBaseUrl",
   "frontend.githubUrl": "githubUrl",
   "websocket.gamePath": "wsGamePath",

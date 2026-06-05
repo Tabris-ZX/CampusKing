@@ -193,9 +193,9 @@ function handlePreviewImageError(event) {
 onMounted(async () => {
   document.addEventListener("keydown", onKeydown);
   try {
-    const config = await api("/api/config");
+    const config = await api("/game/config");
     assetBaseUrl.value = (config.assetBaseUrl || assetRoot()).trim();
-    cards.value = await api("/api/cards");
+    cards.value = await api("/game/cards");
   } catch (error) {
     showToast(error.message, "error");
   } finally {

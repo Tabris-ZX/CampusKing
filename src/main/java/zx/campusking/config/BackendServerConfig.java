@@ -16,5 +16,8 @@ public class BackendServerConfig implements WebServerFactoryCustomizer<Configura
     @Override
     public void customize(ConfigurableServletWebServerFactory factory) {
         factory.setPort(DEFAULTS.backendPort());
+        if (!DEFAULTS.contextPath().isBlank()) {
+            factory.setContextPath(DEFAULTS.contextPath());
+        }
     }
 }

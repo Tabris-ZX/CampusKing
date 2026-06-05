@@ -112,8 +112,9 @@ import designMarkdown from "../../../docs/design.md?raw";
 import howToAddMarkdown from "../../../docs/how-to-add.md?raw";
 import ruleMarkdown from "../../../docs/rule.md?raw";
 import { isAdminAuthenticated, markAdminAuthenticated, renderMarkdown, verifyAdminPassword } from "../lib/admin";
+import { apiUrl } from "../lib/api-url";
 import { api } from "../lib/game";
-import { assetUrl, githubUrl } from "../lib/runtime-config";
+import { githubUrl } from "../lib/runtime-config";
 import { ensureSessionPlayerName, loadSession } from "../lib/session";
 import { showToast } from "../lib/toast";
 
@@ -138,7 +139,7 @@ const props = defineProps({
 
 const route = useRoute();
 const router = useRouter();
-const titleImageUrl = computed(() => assetUrl("images/ui/title.webp"));
+const titleImageUrl = computed(() => apiUrl("/assets/ui/title.webp"));
 const repoUrl = computed(() => githubUrl());
 const noticeOpen = ref(false);
 const docsOpen = ref(false);
@@ -239,7 +240,7 @@ async function loadNotices() {
   noticeLoading.value = true;
   noticeError.value = "";
   try {
-    const data = await api("/api/notices");
+    const data = await api("/game/notices");
     notices.value = data.map(notice => ({
       ...notice,
       title: noticeTitle(notice.markdown, notice.name),

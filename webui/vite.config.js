@@ -9,6 +9,12 @@ const backendPort = Number.parseInt(webuiConfig.backendPort, 10) || 8080;
 const frontendPort = Number.parseInt(webuiConfig.frontendPort, 10) || 5173;
 const apiProxyTarget = `http://127.0.0.1:${backendPort}`;
 const wsProxyTarget = `ws://127.0.0.1:${backendPort}`;
+const apiProxyPaths = [
+  "/assets",
+  "/game",
+  "/cpk/assets",
+  "/cpk/game"
+];
 
 export default defineConfig({
   plugins: [vue()],
@@ -30,17 +36,25 @@ export default defineConfig({
   server: {
     port: frontendPort,
     host: "0.0.0.0",
-    allowedHosts: ['cpk.tabriszx.site'],
+    allowedHosts: ["cpk.tabriszx.site", "api.tabriszx.site"],
+    cors: {
+      origin: ["https://cpk.tabriszx.site"],
+      methods: ["GET", "POST", "OPTIONS"],
+      allowedHeaders: ["Content-Type"]
+    },
     fs: {
       allow: [
         resolve(__dirname, "..")
       ]
     },
     proxy: {
-      "/api": {
-        target: apiProxyTarget,
-        changeOrigin: true
-      },
+      ...Object.fromEntries(apiProxyPaths.map(proxyPath => [
+        proxyPath,
+        {
+          target: apiProxyTarget,
+          changeOrigin: true
+        }
+      ])),
       "/ws": {
         target: wsProxyTarget,
         ws: true,

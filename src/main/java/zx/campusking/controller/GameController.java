@@ -40,7 +40,7 @@ import java.util.NoSuchElementException;
  * Controller 只负责 HTTP 入参/出参和异常映射，实际房间与对局规则委托给 service 层。
  */
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/game")
 public class GameController {
 
     private final GameService gameService;

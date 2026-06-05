@@ -1,4 +1,5 @@
 import { EFFECT_CATEGORY_TEXT, EFFECT_TYPE_TEXT, RARITY_TEXT, SKILL_RANGE_TEXT, TYPE_TEXT } from "./constants";
+import { apiUrl } from "./api-url";
 import { apiRoot } from "./runtime-config";
 
 export function buildInviteLink(roomCode, baseUrl = apiRoot()) {
@@ -41,9 +42,13 @@ export function isMissingRoomError(error) {
 }
 
 export async function api(path, options = {}) {
-  const response = await fetch(`${apiRoot()}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...options
+  const headers = new Headers(options.headers || {});
+  if (options.body != null && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  const response = await fetch(apiUrl(path), {
+    ...options,
+    headers
   });
   const data = await response.json();
   if (!response.ok) {
@@ -129,16 +134,14 @@ export function cardImage(cardOrId, cardsMap = {}, assetBaseUrl = "") {
   if (normalizedAssetBaseUrl) {
     return `${normalizedAssetBaseUrl}/images/texture/${folder}/${card.id}.webp`;
   }
-  const base = apiRoot().replace(/\/$/, "");
-  return `${base}/api/assets/card-images/${folder}/${card.id}`;
+  return apiUrl(`/assets/card-images/${folder}/${card.id}`);
 }
 
 export function cardTexture(textureId) {
   if (!textureId) {
     return "";
   }
-  const base = apiRoot().replace(/\/$/, "");
-  return `${base}/api/assets/card-textures/cards/${textureId}`;
+  return apiUrl(`/assets/card-textures/cards/${textureId}`);
 }
 
 export function swapCardImageToFallback(event, cardOrId, cardsMap = {}, assetBaseUrl = "") {

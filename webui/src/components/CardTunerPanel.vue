@@ -210,7 +210,7 @@ watch(selectedCardId, () => {
 
 onMounted(async () => {
   try {
-    const loadedCards = await api("/api/cards");
+    const loadedCards = await api("/game/cards");
     cards.value = loadedCards;
     if (!selectedCardId.value || !loadedCards.some(card => card.id === selectedCardId.value)) {
       selectedCardId.value = loadedCards.find(card => card.rarity === "RARE")?.id || loadedCards[0]?.id || fallbackCards[0].id;

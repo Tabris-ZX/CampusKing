@@ -138,7 +138,7 @@
   place-items: center;
   border-radius: 50%;
   background:
-    url("/api/assets/card-textures/cards/actionPoints") center / contain no-repeat,
+    var(--action-point-image, url("/assets/card-textures/cards/actionPoints")) center / contain no-repeat,
     rgba(15, 36, 61, 0.72);
   color: #fff;
   font-size: var(--tuner-cost-font);

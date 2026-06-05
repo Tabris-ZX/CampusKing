@@ -490,7 +490,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import { useRouter } from "vue-router";
 import AppTopbar from "../components/AppTopbar.vue";
 import { actionCostOf, api, buildInviteLink, cardImage, describeAttack, describeEffect, describeEffectCategory, describeEffectType, describeRarity, describeSkillRange, describeType, getInviteBlockedReason, isMissingRoomError, swapCardImageToFallback } from "../lib/game";
-import { apiRoot, assetRoot, copyText, publicBaseUrl, wsGamePath, wsRoot } from "../lib/runtime-config";
+import { apiUrl } from "../lib/api-url";
+import { assetRoot, copyText, publicBaseUrl, wsGamePath, wsRoot } from "../lib/runtime-config";
 import { clearSession, ensureSessionPlayerName, loadSession, saveSession } from "../lib/session";
 import { showToast } from "../lib/toast";
 
@@ -1385,7 +1386,7 @@ async function leaveBattle({ remote = true, silent = false } = {}) {
   leavingBattle.value = true;
   try {
     if (remote && roomCode.value && playerToken.value) {
-      await api(`/api/rooms/${roomCode.value}/leave`, {
+      await api(`/game/rooms/${roomCode.value}/leave`, {
         method: "POST",
         body: JSON.stringify({ playerToken: playerToken.value })
       });
@@ -1456,7 +1457,7 @@ function playerHpPercent(player) {
 }
 
 function uiAssetImage(fileName) {
-  return `${apiRoot().replace(/\/$/, "")}/api/assets/ui/${fileName}`;
+  return apiUrl(`/assets/ui/${fileName}`);
 }
 
 function boardCardClass(instance, isSelfBoard) {
@@ -1539,7 +1540,7 @@ async function refreshRoom() {
     return;
   }
   try {
-    match.value = await api(`/api/rooms/${roomCode.value}`);
+    match.value = await api(`/game/rooms/${roomCode.value}`);
   } catch (error) {
     if (isMissingRoomError(error)) {
       clearInvalidBattleSession();
@@ -1616,7 +1617,7 @@ async function restoreMatchSession() {
   playerToken.value = saved.playerToken;
   playerName.value = saved.playerName || ensureSessionPlayerName(saved);
   try {
-    const session = await api(`/api/rooms/${roomCode.value}/session/${playerToken.value}`);
+    const session = await api(`/game/rooms/${roomCode.value}/session/${playerToken.value}`);
     match.value = session.match;
     selfPlayerId.value = session.playerId;
     resultHandled.value = false;
@@ -1709,7 +1710,7 @@ function toggleDiscardSelection(instanceId) {
 
 async function summonCard(instanceId) {
   try {
-    match.value = await api(`/api/matches/${match.value.matchId}/summon`, {
+    match.value = await api(`/game/matches/${match.value.matchId}/summon`, {
       method: "POST",
       body: JSON.stringify({ playerId: selfPlayerId.value, handInstanceId: instanceId })
     });
@@ -1744,7 +1745,7 @@ async function playSkill(instanceId, targetPlayerId = null, targetInstanceId = n
       showToast(`请选择 ${requiredDiscardCount} 张手牌作为技能弃置。`, "info");
       return;
     }
-    match.value = await api(`/api/matches/${match.value.matchId}/play-skill`, {
+    match.value = await api(`/game/matches/${match.value.matchId}/play-skill`, {
       method: "POST",
       body: JSON.stringify({
         playerId: selfPlayerId.value,
@@ -1770,7 +1771,7 @@ async function playSkill(instanceId, targetPlayerId = null, targetInstanceId = n
 async function attackCharacter(attackerInstanceId, defenderInstanceId) {
   try {
     const attackAnimation = animateCharacterAttack(attackerInstanceId, defenderInstanceId);
-    const nextMatch = await api(`/api/matches/${match.value.matchId}/attack-character`, {
+    const nextMatch = await api(`/game/matches/${match.value.matchId}/attack-character`, {
       method: "POST",
       body: JSON.stringify({
         playerId: selfPlayerId.value,
@@ -1804,7 +1805,7 @@ async function attackPlayer() {
   try {
     const attackerInstanceId = selectedAttackerId.value;
     const attackAnimation = animatePlayerAttack(attackerInstanceId, opponentPlayer.value.playerId);
-    const nextMatch = await api(`/api/matches/${match.value.matchId}/attack-player`, {
+    const nextMatch = await api(`/game/matches/${match.value.matchId}/attack-player`, {
       method: "POST",
       body: JSON.stringify({
         playerId: selfPlayerId.value,
@@ -1840,7 +1841,7 @@ function toggleSacrificeMode() {
 
 async function sacrificeCard(instanceId) {
   try {
-    match.value = await api(`/api/matches/${match.value.matchId}/sacrifice`, {
+    match.value = await api(`/game/matches/${match.value.matchId}/sacrifice`, {
       method: "POST",
       body: JSON.stringify({
         playerId: selfPlayerId.value,
@@ -1862,7 +1863,7 @@ async function sortHand() {
     return;
   }
   try {
-    match.value = await api(`/api/matches/${match.value.matchId}/sort-hand?playerId=${selfPlayerId.value}`, {
+    match.value = await api(`/game/matches/${match.value.matchId}/sort-hand?playerId=${selfPlayerId.value}`, {
       method: "POST"
     });
     selectedHandId.value = "";
@@ -1898,7 +1899,7 @@ async function endTurn() {
     }
   }
   try {
-    match.value = await api(`/api/matches/${match.value.matchId}/end-turn`, {
+    match.value = await api(`/game/matches/${match.value.matchId}/end-turn`, {
       method: "POST",
       body: JSON.stringify({
         playerId: selfPlayerId.value,
@@ -2024,9 +2025,9 @@ onMounted(async () => {
   }
   nextTick(updateHandRowWidth);
   try {
-    const config = await api("/api/config");
+    const config = await api("/game/config");
     assetBaseUrl.value = (config.assetBaseUrl || assetRoot()).trim();
-    const cards = await api("/api/cards");
+    const cards = await api("/game/cards");
     cardsMap.value = Object.fromEntries(cards.map(card => [card.id, card]));
     await restoreMatchSession();
   } catch (error) {

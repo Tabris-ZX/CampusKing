@@ -16,6 +16,10 @@ frontend:
   wsBaseUrl: ""
   githubUrl: "https://github.com/Tabris-ZX/CampusKing"
 
+backend:
+  # baseUrl: 后端接口位置,也会作为前端运行时 API 地址
+  baseUrl: ""
+
 asset:
   # baseUrl: 资源公网地址,例如 COS 桶目录
   # localRoot: 本地资源根目录,用于后端兜底读取 favicon/图片等静态资源
