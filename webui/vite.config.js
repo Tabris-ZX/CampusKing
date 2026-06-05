@@ -30,6 +30,7 @@ export default defineConfig({
   server: {
     port: frontendPort,
     host: "0.0.0.0",
+    allowedHosts: ['cpk.tabriszx.site'],
     fs: {
       allow: [
         resolve(__dirname, "..")
